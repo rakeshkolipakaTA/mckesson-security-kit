@@ -1,0 +1,48 @@
+# .github/workflows/security-scan.yml  - security scan on every pull request and on main.
+# Starts report-only (SEC_PRESET=starter in .security/config.env). Change it to standard to block PRs: secscan config set SEC_PRESET standard.
+name: security-scan
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  # security-events: write      # only if you enable the code-scanning upload step at the bottom
+jobs:
+  scan:
+    runs-on: ubuntu-latest        # or your self-hosted runner (it needs Docker)
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Security scan
+        run: .security/secscan scan
+        env:
+          # Only needed if you turned on SonarQube (SEC_SONAR=1). Set in repo Settings > Secrets and variables.
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+      - name: Show results on the run page
+        if: always()
+        run: |
+          f=$(find .security/reports -maxdepth 2 -name summary.md 2>/dev/null | sort | tail -1)
+          if [ -n "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY"; else echo "No report was produced - see the Security scan step log." >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Keep the report (HTML + markdown + SARIF; NOT the raw tool output)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: |
+            .security/reports/20*/summary.html
+            .security/reports/20*/summary.md
+            .security/reports/20*/results.sarif
+          retention-days: 14
+      # Optional: show findings in the GitHub "Security" tab (needs GitHub code scanning / Advanced Security on the repo).
+      # - name: Upload to code scanning
+      #   if: always()
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   with:
+      #     sarif_file: .security/reports/latest

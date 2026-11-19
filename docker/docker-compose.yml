@@ -1,0 +1,41 @@
+# Central platform services for the McKesson scanning framework.
+#   Local SonarQube only:   cd docker && docker compose --env-file ../versions.env up -d
+#   Server (Sonar + dashboard, reachable by CI):   scripts/platform-up.sh   (generates credentials, see docs/dashboard.md)
+name: mckesson-sonar
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:-sonar-local-only}
+      POSTGRES_DB: sonarqube
+    volumes: [sonar_db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 5s
+      retries: 20
+  sonarqube:
+    image: ${SONARQUBE_IMAGE}
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:-sonar-local-only}
+    ports: ["${SONAR_BIND:-127.0.0.1}:${SONAR_PORT:-9000}:9000"]   # localhost only unless platform-up.sh sets SONAR_BIND=0.0.0.0
+    volumes: [sonar_data:/opt/sonarqube/data, sonar_ext:/opt/sonarqube/extensions, sonar_logs:/opt/sonarqube/logs]
+    ulimits: {nofile: {soft: 131072, hard: 131072}}
+    restart: unless-stopped
+  dashboard:
+    profiles: [dashboard]
+    build: ../dashboard
+    image: mckesson-secscan-dashboard:1
+    environment:
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?run scripts/platform-up.sh}
+      DASHBOARD_INGEST_TOKEN: ${DASHBOARD_INGEST_TOKEN:?run scripts/platform-up.sh}
+      DASHBOARD_USER: ${DASHBOARD_USER:-secscan}
+      SONAR_PUBLIC_URL: ${SONAR_PUBLIC_URL:-}
+    ports: ["${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT:-8090}:8090"]
+    volumes: [dashboard_data:/data]
+    restart: unless-stopped
+volumes: {sonar_db: {}, sonar_data: {}, sonar_ext: {}, sonar_logs: {}, dashboard_data: {}}

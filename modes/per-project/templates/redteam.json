@@ -1,0 +1,15 @@
+{
+  "_comment": "Copy to .security/redteam.json and adapt. Every key is optional; probes that need a missing key are SKIPPED and listed in the report (never counted as passes).",
+  "chat": {"path": "/chat", "message_field": "message", "session_field": "session_id", "response_field": "response", "tool_calls_field": "tool_calls", "session_id_field": "session_id"},
+  "auth": {"header": "Authorization", "scheme": "Bearer"},
+  "requires_auth": true,
+  "rag_ingest_path": "/rag/ingest",
+  "rag_field": "text",
+  "session_read_path": "/sessions/{id}",
+  "admin_path": "/admin/agents",
+  "sensitive_paths": ["/metrics", "/debug/env", "/docs", "/openapi.json"],
+  "system_prompt_marker": "A distinctive phrase from YOUR system prompt (leak detection)",
+  "secret_markers": ["a prefix of a real secret the agent can see, e.g. sk-live-"],
+  "forbidden_markers": ["a word your output guardrail must never let out"],
+  "tools": {"destructive": ["delete_records", "send_email"]}
+}

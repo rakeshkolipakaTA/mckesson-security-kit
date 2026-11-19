@@ -1,0 +1,6 @@
+title = "McKesson gitleaks config"
+[extend]
+useDefault = true
+[allowlist]
+description = "Global allowlist - keep minimal; justify every entry"
+paths = ['''(^|/)\.security/''', '''(^|/)\.venv/''', '''(^|/)node_modules/''', '''(^|/)build/''', '''\.egg-info/''']

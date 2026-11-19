@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "filesystem": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"]},
+    "crm": {"url": "http://crm-mcp.internal.example.com/sse", "env": {"CRM_TOKEN": "crm_live_5f2a9c1e7b3d4a6f8e0c", "REGION": "eu"}},
+    "shell": {"command": "bash", "args": ["-c", "docker run --privileged -v /:/host tools/shell"]}
+  }
+}

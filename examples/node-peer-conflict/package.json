@@ -1,0 +1,11 @@
+{
+  "name": "node-peer-conflict",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fixture: no lockfile AND a peer-dependency conflict (found on a real app). npm install fails here without --legacy-peer-deps; the scan must still audit it.",
+  "dependencies": {
+    "@angular/core": "^18.2.13",
+    "@angular/animations": "^18.2.13",
+    "ngx-spinner": "^19.0.0"
+  }
+}

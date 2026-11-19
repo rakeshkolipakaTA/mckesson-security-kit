@@ -1,0 +1,42 @@
+# .github/workflows/security-release.yml - the CD gate: scan code AND the built image BEFORE it is published/deployed.
+# EDIT the three "EDIT:" lines. The strict "release" gate blocks on any Critical or High finding that is not in your approved exceptions.
+name: security-release-gate
+on:
+  push:
+    tags: ['v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-scan-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      IMAGE: myapp:${{ github.sha }}          # EDIT: your image name
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t "$IMAGE" .       # EDIT: build context / Dockerfile path if different
+      - name: Release security gate (code + dependencies + image)
+        run: .security/secscan gate --gate release --image "$IMAGE"
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+      - name: Show results on the run page
+        if: always()
+        run: |
+          f=$(find .security/reports -maxdepth 2 -name summary.md 2>/dev/null | sort | tail -1)
+          [ -n "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-release-report
+          path: |
+            .security/reports/20*/summary.html
+            .security/reports/20*/summary.md
+      # Only reached when the gate above passed:
+      - name: Push image
+        run: echo 'EDIT - docker login, docker tag and docker push to JFrog / ACR go here'

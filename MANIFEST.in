@@ -1,0 +1,7 @@
+include VERSION versions.env README.md
+recursive-include scripts *
+recursive-include configs *
+recursive-include docker *
+recursive-include agentic/agentsec *.py
+recursive-include modes/per-project *
+global-exclude __pycache__ *.pyc

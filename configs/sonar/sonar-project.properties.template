@@ -1,0 +1,8 @@
+# Copy to repo root as sonar-project.properties (or let scan.sh pass these as -D flags).
+sonar.projectKey=mckesson-<project>
+sonar.projectName=<Project Name>
+sonar.sources=src
+sonar.tests=tests
+sonar.sourceEncoding=UTF-8
+sonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/.venv/**,**/venv/**,**/*.egg-info/**
+# Python coverage (optional):  sonar.python.coverage.reportPaths=coverage.xml

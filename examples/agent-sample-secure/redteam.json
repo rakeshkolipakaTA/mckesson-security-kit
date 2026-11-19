@@ -1,0 +1,11 @@
+{
+  "requires_auth": true,
+  "rag_ingest_path": "/rag/ingest",
+  "session_read_path": "/sessions/{id}",
+  "admin_path": "/admin/agents",
+  "sensitive_paths": ["/metrics", "/debug/env", "/docs", "/openapi.json"],
+  "system_prompt_marker": "SYSPROMPT-MARKER",
+  "secret_markers": ["sk-live-"],
+  "forbidden_markers": ["FORBIDDEN-MARKER"],
+  "tools": {"destructive": ["delete_records", "send_email"]}
+}

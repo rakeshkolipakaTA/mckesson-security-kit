@@ -1,0 +1,2 @@
+# Semgrep rule ids excluded for ALL projects (noise, not security). One per line; justify each in a comment.
+python.lang.compatibility.python37.python37-compatibility-importlib2   # flags `from importlib import resources`; irrelevant for Python >= 3.8

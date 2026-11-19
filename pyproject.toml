@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mckesson-secscan"
+dynamic = ["version"]
+description = "McKesson secure CI/CD scanning kit: one command to scan a repo (secrets, SAST, SCA, containers, AI-agent checks) and gate builds."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []          # the scanners run in pinned Docker images; nothing else is installed
+
+[project.scripts]
+secscan = "mckesson_secscan.cli:main"
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mckesson_secscan = ["kit/**/*", "kit/*"]

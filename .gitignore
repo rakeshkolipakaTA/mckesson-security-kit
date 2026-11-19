@@ -1,0 +1,13 @@
+# generated
+build/
+dist/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.venv/
+reports/
+# local working material: never published (production logs, real scan results, internal planning notes)
+logs.txt
+lisa_logs.txt
+plan.md
+agentics_ai_presentation.md

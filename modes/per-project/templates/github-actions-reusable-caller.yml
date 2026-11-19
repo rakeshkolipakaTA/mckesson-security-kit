@@ -1,0 +1,13 @@
+# Option B (central framework, no kit in your repo): .github/workflows/security.yml
+# Your repo only needs this file (+ optionally .security/config.env and exceptions.json).
+name: security
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+jobs:
+  security:
+    uses: rakeshkolipakaTA/mckesson-security-kit/.github/workflows/security-scan-reusable.yml@v1
+    with:
+      enforce: false          # flip to true when the team is ready to block PRs
+    secrets: inherit

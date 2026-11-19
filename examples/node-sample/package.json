@@ -1,0 +1,7 @@
+{
+  "name": "node-sample",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TEST FIXTURE - intentionally vulnerable",
+  "dependencies": { "express": "4.17.1", "lodash": "4.17.15", "minimist": "1.2.5", "jsonwebtoken": "8.5.1" }
+}

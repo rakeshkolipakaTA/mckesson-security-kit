@@ -1,0 +1,37 @@
+// Add these stages to your Jenkinsfile (declarative pipeline). The agent needs Docker.
+// Starts report-only (SEC_PRESET=starter in .security/config.env). Change it to standard to fail builds.
+
+// 1) Every branch / PR build -------------------------------------------------------------------
+stage('Security scan') {
+    steps {
+        // Remove withCredentials if you do not use SonarQube. Create the credential 'sonar-token' (Secret text).
+        // Optional: also create a Secret text credential 'secscan-dashboard-token' and add
+        //   string(credentialsId: 'secscan-dashboard-token', variable: 'SECSCAN_DASHBOARD_TOKEN')
+        // inside withCredentials([...]) to publish each result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env).
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+            sh '.security/secscan scan'
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: '.security/reports/20*/summary.html, .security/reports/20*/summary.md, .security/reports/20*/results.sarif', allowEmptyArchive: true
+            // Optional (HTML Publisher plugin): shows the report as a link on the build page
+            // publishHTML(target: [reportDir: '.security/reports/latest', reportFiles: 'summary.html', reportName: 'Security report', keepAll: true, allowMissing: true])
+        }
+    }
+}
+
+// 2) CD: BEFORE pushing the image to JFrog / ACR -------------------------------------------------
+stage('Image security gate') {
+    steps {
+        sh 'docker build -t "$IMAGE" .'                                  // EDIT: your image variable
+        sh '.security/secscan gate --gate release --image "$IMAGE"'      // fails the build on Critical/High
+    }
+}
+
+// 3) After the QA deployment (QA/UAT only, never prod) --------------------------------------------
+stage('DAST (QA)') {
+    steps {
+        sh '.security/secscan scan --zap-url "$QA_URL" --zap-mode baseline'
+    }
+}

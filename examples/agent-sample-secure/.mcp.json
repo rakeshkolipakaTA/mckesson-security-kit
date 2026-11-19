@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "filesystem": {"command": "npx", "args": ["@modelcontextprotocol/server-filesystem@2025.1.14", "/app/data"]},
+    "crm": {"url": "https://crm-mcp.internal.example.com/sse", "env": {"CRM_TOKEN": "${CRM_TOKEN}", "REGION": "eu"}}
+  }
+}

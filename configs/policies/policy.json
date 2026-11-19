@@ -1,0 +1,86 @@
+{
+  "_comment": "Proposed internal defaults from plan sections 7. To be agreed with McKesson security team; not McKesson policy.",
+  "severity_order": [
+    "CRITICAL",
+    "HIGH",
+    "MEDIUM",
+    "LOW",
+    "INFO"
+  ],
+  "unknown_severity_as": "HIGH",
+  "secret_severity": "HIGH",
+  "gates": {
+    "pr": {
+      "block_new": [
+        "CRITICAL",
+        "HIGH"
+      ],
+      "block_existing": [
+        "CRITICAL"
+      ]
+    },
+    "release": {
+      "block_new": [
+        "CRITICAL",
+        "HIGH"
+      ],
+      "block_existing": [
+        "CRITICAL",
+        "HIGH"
+      ]
+    }
+  },
+  "sla_days": {
+    "CRITICAL": 3,
+    "HIGH": 14,
+    "MEDIUM": 60,
+    "LOW": 90
+  },
+  "semgrep_severity_cap": {
+    "python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query": "MEDIUM"
+  },
+  "_semgrep_note": "Heuristic rules that cannot tell parameterised from concatenated SQL are capped so they flag for review without blocking on their own.",
+  "required_tools": {
+    "always": [
+      "gitleaks",
+      "semgrep",
+      "trivy-fs"
+    ],
+    "by_profile": {
+      "agent": [
+        "agent-scan"
+      ]
+    },
+    "when_present": [
+      "modelscan"
+    ],
+    "_note": "A project cannot turn these off in config.env. To waive one, add a time-boxed entry {tool, reason, approved_by, expires} to .security/exceptions.json."
+  },
+  "presets": {
+    "_note": "Defaults a team gets by choosing SEC_PRESET. Any explicit SEC_* setting overrides the preset. Tool values: auto (run when it fits) | on | off.",
+    "starter": {
+      "enforce": 0,
+      "gate": "pr",
+      "tools": {
+        "sonar": "off",
+        "depcheck": "off"
+      }
+    },
+    "standard": {
+      "enforce": 1,
+      "gate": "pr",
+      "tools": {
+        "sonar": "off",
+        "depcheck": "off"
+      }
+    },
+    "strict": {
+      "enforce": 1,
+      "gate": "release",
+      "tools": {
+        "sonar": "auto",
+        "depcheck": "auto"
+      }
+    }
+  }
+}

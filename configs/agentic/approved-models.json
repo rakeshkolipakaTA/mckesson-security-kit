@@ -1,0 +1,11 @@
+{
+  "_comment": "EXAMPLE org model registry. The platform/security team owns this file (a project cannot override it). Patterns are fnmatch globs matched against the model id found in code/config. Replace with the real approved list.",
+  "approved_models": [
+    "claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-2",
+    "anthropic.claude-*", "us.anthropic.claude-*",
+    "gpt-4o-2024-08-06",
+    "text-embedding-3-small", "text-embedding-3-large"
+  ],
+  "approved_endpoints": ["api.anthropic.com", "*.openai.azure.com", "bedrock-runtime.*.amazonaws.com", "localhost", "127.0.0.1"],
+  "floating_alias_regex": "(-latest$|-preview$|^gpt-4$|^gpt-4o$|^gpt-4-turbo$|^gpt-3\\.5-turbo$|^claude-3(-5)?-(opus|sonnet|haiku)$|^gemini-pro$)"
+}

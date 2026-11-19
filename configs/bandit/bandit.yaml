@@ -1,0 +1,3 @@
+# Bandit standard config. Projects may extend via .security/bandit.yaml
+exclude_dirs: [".security", ".venv", "venv", "node_modules", "build", "dist", ".git", "tests", "test", ".pytest_cache", "site-packages"]
+skips: []   # e.g. ["B101"] to skip assert checks; justify in the PR

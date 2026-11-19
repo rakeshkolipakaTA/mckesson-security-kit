@@ -1,0 +1,435 @@
+# McKesson agentic-AI code rules (Python). Each rule maps to a presentation domain (P1-P8) and OWASP LLM / Agents risk.
+# Tested with annotated cases in agentic.py:  docker run --rm -v "$PWD/configs/semgrep/agentic:/rules" <semgrep-image> semgrep --test --metrics=off /rules
+rules:
+  - id: mckesson-agent-guardrail-fail-open-function
+    languages: [python]
+    severity: ERROR
+    message: >-
+      This guardrail/validator catches errors and then ALLOWS the request (fail-open). Any error, timeout or odd input must block:
+      return False / raise (agentsec.enforce is fail-closed).
+    metadata: {domain: P3, owasp: "LLM01", cwe: "CWE-636", category: security, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: |
+              def $F(...):
+                  ...
+                  try:
+                      ...
+                  except $E:
+                      ...
+                      return True
+          - pattern: |
+              def $F(...):
+                  ...
+                  try:
+                      ...
+                  except $E as $V:
+                      ...
+                      return True
+          - pattern: |
+              def $F(...):
+                  ...
+                  try:
+                      ...
+                  except:
+                      ...
+                      return True
+          - pattern: |
+              def $F(...):
+                  ...
+                  try:
+                      ...
+                  except $E as $V:
+                      pass
+          - pattern: |
+              def $F(...):
+                  ...
+                  try:
+                      ...
+                  except $E:
+                      pass
+          - pattern: |
+              def $F(...):
+                  ...
+                  try:
+                      ...
+                  except:
+                      pass
+      - metavariable-regex:
+          metavariable: $F
+          regex: (?i)^(check|validate|verify|moderate|screen|is_(safe|allowed|ok|valid)|allow|guard|filter|sanitize|policy)\w*$|^\w*(guard|moderat|safety|content_filter|check_(input|output))\w*$
+
+  - id: mckesson-agent-guardrail-fail-open-callsite
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A guardrail call is wrapped in try/except that swallows the error and continues: the request proceeds unchecked (fail-open).
+      Treat any guardrail error as a block.
+    metadata: {domain: P3, owasp: "LLM01", cwe: "CWE-636", category: security, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: |
+              try:
+                  ...
+                  $G(...)
+                  ...
+              except $E:
+                  pass
+          - pattern: |
+              try:
+                  ...
+                  $G(...)
+                  ...
+              except $E as $V:
+                  pass
+          - pattern: |
+              try:
+                  ...
+                  $G(...)
+                  ...
+              except $E:
+                  continue
+          - pattern: |
+              try:
+                  ...
+                  $G(...)
+                  ...
+              except $E:
+                  $LOG.$M(...)
+      - metavariable-regex:
+          metavariable: $G
+          regex: (?i).*(guard|moderat|safety|policy_check|validate_(input|output)|check_(input|output)|content_filter).*
+      - pattern-not: |
+          try:
+              ...
+          except $E:
+              ...
+              raise
+      - pattern-not: |
+          try:
+              ...
+          except $E:
+              ...
+              return False
+
+  - id: mckesson-agent-tool-param-to-file
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A tool parameter (chosen by the model, and therefore steerable by prompt injection) reaches a file operation without normalising it
+      against an allowed base directory. Use agentsec.safe_path() / resolve()+is_relative_to().
+    metadata: {domain: P3, owasp: "LLM06", cwe: "CWE-22", category: security, confidence: HIGH}
+    pattern-sources: &tool_params
+      - patterns:
+          - pattern: $ARG
+          - pattern-either:
+              - pattern-inside: |
+                  @tool
+                  def $F(..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  @tool(...)
+                  def $F(..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  @$M.tool(...)
+                  def $F(..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  @$M.tool
+                  def $F(..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  @function_tool
+                  def $F(..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  @kernel_function(...)
+                  def $F(..., $ARG, ...):
+                      ...
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: safe_path(...)
+          - pattern: agentsec.safe_path(...)
+          - pattern: os.path.basename(...)
+          - pattern: secure_filename(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: open(...)
+          - pattern: pathlib.Path(...)
+          - pattern: Path(...)
+          - pattern: os.remove(...)
+          - pattern: os.listdir(...)
+          - pattern: shutil.$F(...)
+
+  - id: mckesson-agent-tool-param-to-network
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A tool parameter (model/prompt controlled) is used as a network destination: SSRF into internal services and cloud metadata.
+      Use an egress allow-list and block private ranges (agentsec.safe_fetch).
+    metadata: {domain: P4, owasp: "LLM06", cwe: "CWE-918", category: security, confidence: HIGH}
+    pattern-sources: *tool_params
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: validate_url(...)
+          - pattern: agentsec.validate_url(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: requests.$M(...)
+          - pattern: httpx.$M(...)
+          - pattern: urllib.request.urlopen(...)
+          - pattern: urlopen(...)
+          - pattern: urllib.request.Request(...)
+          - pattern: aiohttp.$X.$M(...)
+
+  - id: mckesson-agent-tool-param-to-exec
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A tool parameter (model/prompt controlled) is executed as code or as a shell command. This hands code execution on the host to
+      whoever can influence the prompt. Remove it, or run it in an isolated sandbox with no network, secrets or host access.
+    metadata: {domain: P2, owasp: "LLM05", cwe: "CWE-94", category: security, confidence: HIGH}
+    pattern-sources: *tool_params
+    pattern-sinks:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+          - pattern: compile(...)
+          - pattern: os.system(...)
+          - pattern: os.popen(...)
+          - pattern: subprocess.$F(...)
+
+  - id: mckesson-agent-tool-param-to-sql
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A tool parameter (model/prompt controlled) is executed as SQL. Use pre-defined parameterised queries or a read-only, row-filtered DB role.
+    metadata: {domain: P2, owasp: "LLM05", cwe: "CWE-89", category: security, confidence: HIGH}
+    pattern-sources: *tool_params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $C.execute($Q, ...)
+              - pattern: $C.executemany($Q, ...)
+              - pattern: $C.executescript($Q, ...)
+              - pattern: $C.raw($Q, ...)
+          - focus-metavariable: $Q
+
+  - id: mckesson-agent-llm-output-to-sink
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Model output flows into code execution or a database call. Model output is untrusted input: validate against a schema/allow-list and
+      never execute it directly.
+    metadata: {domain: P2, owasp: "LLM05", cwe: "CWE-94", category: security, confidence: MEDIUM}
+    pattern-sources:
+      - pattern-either:
+          - pattern: $LLM.invoke(...)
+          - pattern: $LLM.predict(...)
+          - pattern: $LLM.generate(...)
+          - pattern: $LLM.complete(...)
+          - pattern: $C.chat.completions.create(...)
+          - pattern: $C.messages.create(...)
+          - pattern: $C.responses.create(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+          - pattern: os.system(...)
+          - pattern: subprocess.$F(...)
+          - patterns:
+              - pattern: $C.execute($Q, ...)
+              - focus-metavariable: $Q
+
+  - id: mckesson-agent-unrestricted-tool-dispatch
+    languages: [python]
+    severity: WARNING
+    message: >-
+      The tool to run is looked up from a model-chosen name with no allow-list / policy check. A prompt-injected or hallucinated name
+      can reach any registered function. Route every call through a default-deny policy (agentsec.PEP).
+    metadata: {domain: P8, owasp: "LLM06", cwe: "CWE-285", category: security, confidence: LOW}
+    patterns:
+      - pattern-either:
+          - pattern: $REG.get($C["name"])
+          - pattern: $REG[$C["name"]]
+          - pattern: getattr($O, $C["name"])
+          - pattern: globals()[$C["name"]]
+      - metavariable-regex:
+          metavariable: $C
+          regex: (?i).*(call|tool|action|function|fc|step).*
+
+  - id: mckesson-agent-unauthenticated-route
+    languages: [python]
+    severity: WARNING
+    message: >-
+      An agent/LLM/admin/session route has no authentication dependency. Without an authorization proxy anyone who can reach it can use
+      the agent, read sessions or see its configuration. (Ignore if authentication is applied app-wide or at the router level.)
+    metadata: {domain: P1, owasp: "LLM06", cwe: "CWE-306", category: security, confidence: LOW}
+    patterns:
+      - pattern-either:
+          - pattern: |
+              @$APP.$METHOD($PATH, ...)
+              def $F(...):
+                  ...
+          - pattern: |
+              @$APP.$METHOD($PATH, ...)
+              async def $F(...):
+                  ...
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(get|post|put|delete|patch|api_route)$
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: (?i).*(chat|completion|agent|llm|invoke|stream|prompt|tool|session|admin|model|rag|ingest|metrics|debug).*
+      - pattern-not: |
+          @$APP.$METHOD($PATH, ..., dependencies=[...], ...)
+          def $F(...):
+              ...
+      - pattern-not: |
+          @$APP.$METHOD($PATH, ..., dependencies=[...], ...)
+          async def $F(...):
+              ...
+      - pattern-not: |
+          def $F(..., $P = Depends(...), ...):
+              ...
+      - pattern-not: |
+          def $F(..., $P: $T = Depends(...), ...):
+              ...
+      - pattern-not: |
+          async def $F(..., $P = Depends(...), ...):
+              ...
+      - pattern-not: |
+          async def $F(..., $P: $T = Depends(...), ...):
+              ...
+      - pattern-not: |
+          def $F(..., $P = Security(...), ...):
+              ...
+      - pattern-not: |
+          async def $F(..., $P: $T = Security(...), ...):
+              ...
+
+  - id: mckesson-agent-hardcoded-llm-key
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A provider/API credential is hardcoded. Load it from a secret manager or environment, rotate it, and give agents scoped short-lived
+      tokens instead of long-lived keys.
+    metadata: {domain: P5, owasp: "LLM02", cwe: "CWE-798", category: security, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: $F(..., api_key="$K", ...)
+          - pattern: $F(..., token="$K", ...)
+          - pattern: $VAR = "$K"
+      - metavariable-regex:
+          metavariable: $K
+          regex: ^[A-Za-z0-9_\-./+=]{20,}$
+      - pattern-either:
+          - pattern: $F(..., api_key="$K", ...)
+          - pattern: $F(..., token="$K", ...)
+          - patterns:
+              - pattern: $VAR = "$K"
+              - metavariable-regex:
+                  metavariable: $VAR
+                  regex: (?i)^.*(api[_-]?key|secret|token|password|credential).*$
+
+  - id: mckesson-agent-trust-remote-code
+    languages: [python]
+    severity: ERROR
+    message: trust_remote_code=True downloads and executes code from the model repository at load time. Pin the revision and review, or avoid it.
+    metadata: {domain: P6, owasp: "LLM03", cwe: "CWE-829", category: security, confidence: HIGH}
+    pattern: $F(..., trust_remote_code=True, ...)
+
+  - id: mckesson-agent-unsafe-model-deserialization
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Pickle-based model/index loading executes arbitrary code embedded in the file. Use safetensors / torch.load(weights_only=True) /
+      FAISS without allow_dangerous_deserialization, and only from verified, hash-pinned sources.
+    metadata: {domain: P6, owasp: "LLM03", cwe: "CWE-502", category: security, confidence: HIGH}
+    patterns:
+      - pattern-either:
+          - pattern: $F(..., allow_dangerous_deserialization=True, ...)
+          - pattern: torch.load(...)
+          - pattern: joblib.load(...)
+          - pattern: dill.load(...)
+      - pattern-not: torch.load(..., weights_only=True, ...)
+
+  - id: mckesson-agent-unpinned-model-revision
+    languages: [python]
+    severity: WARNING
+    message: >-
+      A model is pulled from a hub without a pinned revision (commit hash): the weights can change underneath you (supply-chain risk).
+      Pass revision="<commit sha>" and register the model.
+    metadata: {domain: P6, owasp: "LLM03", cwe: "CWE-494", category: security, confidence: MEDIUM}
+    patterns:
+      - pattern: $M.from_pretrained($NAME, ...)
+      - pattern-not: $M.from_pretrained($NAME, ..., revision=..., ...)
+
+  - id: mckesson-agent-dangerous-tool
+    languages: [python]
+    severity: ERROR
+    message: >-
+      This agent tool gives the model code or shell execution (REPL / bash). Anyone who can influence the prompt can run code on the host.
+      Remove it or run it in an isolated sandbox with no network and no secrets.
+    metadata: {domain: P2, owasp: "LLM06", cwe: "CWE-94", category: security, confidence: HIGH}
+    pattern-either:
+      - pattern: PythonREPLTool(...)
+      - pattern: PythonAstREPLTool(...)
+      - pattern: ShellTool(...)
+      - pattern: BashProcess(...)
+      - pattern: $F(..., allow_dangerous_code=True, ...)
+      - pattern: $F(..., allow_dangerous_requests=True, ...)
+
+  - id: mckesson-agent-sensitive-data-in-logs
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Prompts, user messages, emails, headers or tokens are written to logs unmasked. Mask personal data and secrets before logging
+      (agentsec.redact / redact_obj).
+    metadata: {domain: P7, owasp: "LLM02", cwe: "CWE-532", category: security, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: $LOG.$M($FMT, ..., $X, ...)
+          - pattern: $LOG.$M(f"...{$X}...", ...)
+      - metavariable-regex:
+          metavariable: $LOG
+          regex: ^(logger|log|logging|LOG|_log|_logger)$
+      - metavariable-regex:
+          metavariable: $M
+          regex: ^(debug|info|warning|error|critical|exception)$
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?is)^(?!["'])(?!.*redact).*\b(prompt|message|messages|user_input|user_message|query|email|headers|authorization|token|api_key|secret|password)\b.*$
+
+  - id: mckesson-agent-unbounded-agent-loop
+    languages: [python]
+    severity: WARNING
+    message: >-
+      An agent loop calls the model with no step/time/tool-call budget. A confused or manipulated model can loop forever and exhaust
+      cost and capacity. Enforce a hard budget (agentsec.Budget).
+    metadata: {domain: P2, owasp: "LLM10", cwe: "CWE-835", category: security, confidence: LOW}
+    patterns:
+      - pattern: |
+          while True:
+              ...
+              $X = $LLM.$M(...)
+              ...
+      - metavariable-regex:
+          metavariable: $M
+          regex: ^(invoke|complete|predict|generate|create|chat|run)$
+      - pattern-not: |
+          while True:
+              ...
+              $B.step()
+              ...
+      - pattern-not: |
+          while True:
+              ...
+              $I += 1
+              ...

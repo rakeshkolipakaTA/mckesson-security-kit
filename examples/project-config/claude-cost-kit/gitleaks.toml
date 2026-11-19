@@ -1,0 +1,7 @@
+title = "claude-cost-kit overrides"
+[extend]
+path = "/cfg-default/gitleaks.toml"   # inherit the McKesson defaults
+[[allowlists]]
+description = "Dummy token used in unit-test assertions (tests/test_telemetry.py)"
+paths = ['''^tests/''']
+regexes = ['''tok_ABCDEF123456''']
