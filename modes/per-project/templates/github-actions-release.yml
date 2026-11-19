@@ -16,7 +16,9 @@ jobs:
     env:
       IMAGE: myapp:${{ github.sha }}          # EDIT: your image name
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
       - name: Build image
         run: docker build -t "$IMAGE" .       # EDIT: build context / Dockerfile path if different
       - name: Release security gate (code + dependencies + image)
@@ -30,7 +32,7 @@ jobs:
         run: |
           f=$(find .security/reports -maxdepth 2 -name summary.md 2>/dev/null | sort | tail -1)
           [ -n "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
           name: security-release-report

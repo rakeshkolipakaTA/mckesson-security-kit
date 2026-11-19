@@ -14,6 +14,8 @@
 #   per-tool switches       SEC_<TOOL>=auto|on|off   GITLEAKS SEMGREP TRIVY BANDIT PIP_AUDIT NPM_AUDIT ESLINT AGENT_SCAN MODELSCAN TRIVY_IMAGE DEPCHECK SONAR ZAP REDTEAM
 #                           (tools the central policy marks REQUIRED ignore `off` unless .security/exceptions.json holds a valid waiver)
 #   --skip a,b              SEC_SKIP      legacy list form of "=off": gitleaks,trivy,semgrep,bandit,pip-audit,npm-audit,eslint,agent-scan,modelscan
+#   new checks (all SEC_<TOOL>=auto|on|off): GITLEAKS_HISTORY (secrets in past commits), SBOM, WORKFLOW_SCAN (GitHub Actions security), K8S_POSTURE,
+#                           API_FUZZ (needs SEC_API_SPEC=<openapi url>), EXPOSURE (needs SEC_EXPOSURE_TARGETS=<urls/hosts you own>), REPO_POSTURE (needs GITHUB_TOKEN)
 #   --partial               an intentionally incomplete local run (secscan quick): required tools may be skipped
 #   --publish-latest        send the newest report to the dashboard (needs SEC_DASHBOARD_URL + SECSCAN_DASHBOARD_TOKEN)
 #   --explain               print which tools would run and why, then exit (secscan config show)
@@ -53,7 +55,7 @@ while [ $# -gt 0 ]; do
     --redteam-url) SEC_REDTEAM_URL="$2"; shift 2;; --redteam-network) SEC_REDTEAM_NETWORK="$2"; shift 2;; --redteam-contract) SEC_REDTEAM_CONTRACT="$2"; shift 2;;
     --preset) SEC_PRESET="$2"; shift 2;; --partial) PARTIAL=1; shift;; --explain) EXPLAIN=1; shift;; --publish-latest) PUBLISH_LATEST=1; shift;; --exclude) SEC_EXCLUDE_PATHS="$2"; shift 2;;
     --print-profiles) PRINT_PROFILES=1; shift;; --sec-dir) SEC_DIR_ARG="$2"; shift 2;; --out) OUT="$2"; shift 2;;
-    -h|--help) sed -n '2,41p' "$0"; exit 0;;
+    -h|--help) sed -n '2,44p' "$0"; exit 0;;
     -*) echo "unknown option $1 (see --help)" >&2; exit 2;; *) REPO="$1"; shift;;
   esac
 done
@@ -67,7 +69,7 @@ REPO="$(cd "$REPO" && pwd)"; NAME="$(basename "$REPO")"
 SEC_DIR="${SEC_DIR_ARG:-$REPO/.security}"; [ -d "$SEC_DIR" ] && SEC_DIR="$(cd "$SEC_DIR" && pwd)"
 
 # ---- config.env: parsed, never sourced (a pull request must not be able to run code on the scanner) ----
-CONFIG_KEYS=" SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
+CONFIG_KEYS=" SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
 load_config() {
   local line k v
   while IFS= read -r line || [ -n "$line" ]; do
@@ -83,7 +85,7 @@ load_config() {
 # organisation-wide defaults set once by the platform team (SonarQube / dashboard URLs): lowest precedence, a repo's config.env wins
 [ -f "$HERE/configs/central.env" ] && load_config "$HERE/configs/central.env"
 if [ -z "${SONAR_HOST_URL:-}" ] && [ -n "${SEC_SONAR_HOST_URL:-}" ]; then export SONAR_HOST_URL="$SEC_SONAR_HOST_URL"; fi
-: "${SEC_PRESET:=starter}" "${SEC_PROFILE:=auto}" "${SEC_SKIP:=}" "${SEC_DEPCHECK_NOUPDATE:=0}" "${SEC_EXCLUDE_PATHS:=}"
+: "${SEC_PRESET:=starter}" "${SEC_PROFILE:=auto}" "${SEC_SKIP:=}" "${SEC_DEPCHECK_NOUPDATE:=0}" "${SEC_EXCLUDE_PATHS:=}" "${SEC_API_SPEC:=}" "${SEC_API_NETWORK:=}" "${SEC_EXPOSURE_TARGETS:=}" "${SEC_FUZZ_EXAMPLES:=40}"
 # `secscan disable --until DATE --reason ...` switches scanning off for a limited time only; after DATE it resumes by itself
 if [ -n "${SEC_DISABLED_UNTIL:-}" ]; then
   if [[ "$SEC_DISABLED_UNTIL" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && ! [[ "$SEC_DISABLED_UNTIL" < "$(date +%F)" ]]; then
@@ -144,11 +146,20 @@ model_files_present() { has_files -name '*.pkl' -o -name '*.pickle' -o -name '*.
 
 # ---- which tools run: preset + SEC_<TOOL> switches + central required-tools lock + waivers (scripts/toolplan.py) ----
 MODES=""; for kv in gitleaks:GITLEAKS semgrep:SEMGREP trivy-fs:TRIVY bandit:BANDIT pip-audit:PIP_AUDIT npm-audit:NPM_AUDIT eslint:ESLINT agent-scan:AGENT_SCAN \
-  modelscan:MODELSCAN trivy-image:TRIVY_IMAGE dependency-check:DEPCHECK sonarqube:SONAR zap:ZAP redteam:REDTEAM; do
+  modelscan:MODELSCAN trivy-image:TRIVY_IMAGE dependency-check:DEPCHECK sonarqube:SONAR zap:ZAP redteam:REDTEAM \
+  gitleaks-history:GITLEAKS_HISTORY sbom:SBOM workflow-scan:WORKFLOW_SCAN k8s-posture:K8S_POSTURE api-fuzz:API_FUZZ exposure:EXPOSURE repo-posture:REPO_POSTURE; do
   v="SEC_${kv#*:}"; [ -n "${!v:-}" ] && MODES="$MODES,${kv%%:*}=${!v}"
 done
 for t in ${SEC_SKIP//,/ }; do MODES="$MODES,$t=off"; done
-PLAN_ARGS=(--policy "$HERE/configs/policies/policy.json" --preset "$SEC_PRESET" --profiles "$(IFS=,; echo "${PROFILES[*]}")" --modes "${MODES#,}"
+# facts the plan needs: what this checkout looks like
+FACTS=""
+[ -d "$REPO/.git" ] && FACTS="$FACTS,git"
+[ -d "$REPO/.github/workflows" ] && [ -n "$(ls "$REPO"/.github/workflows/*.y*ml 2>/dev/null | head -1)" ] && FACTS="$FACTS,workflows"
+K8S_FILES="$(find_files -name '*.yaml' -o -name '*.yml' | xargs -r grep -lE '^kind:[[:space:]]*(Deployment|StatefulSet|DaemonSet|Pod|Job|CronJob|Service|Ingress|ClusterRole|Role|NetworkPolicy)([[:space:]]|$)' 2>/dev/null | xargs -r grep -L '{{' 2>/dev/null)"
+[ -n "$K8S_FILES" ] && FACTS="$FACTS,k8s"
+GH_SLUG="${GITHUB_REPOSITORY:-$(git -C "$REPO" config --get remote.origin.url 2>/dev/null | sed -nE 's#.*github\.com[:/]+([^/]+/[^/]+)$#\1#p' | sed 's/\.git$//')}"
+[ -n "$GH_SLUG" ] && [ -n "${GITHUB_TOKEN:-${GH_TOKEN:-}}" ] && FACTS="$FACTS,ghrepo"
+PLAN_ARGS=(--facts "${FACTS#,}" --api-spec "$SEC_API_SPEC" --exposure-targets "$SEC_EXPOSURE_TARGETS" --policy "$HERE/configs/policies/policy.json" --preset "$SEC_PRESET" --profiles "$(IFS=,; echo "${PROFILES[*]}")" --modes "${MODES#,}"
   --image "${SEC_IMAGE:-}" --zap-url "${SEC_ZAP_URL:-}" --redteam-url "${SEC_REDTEAM_URL:-}")
 [ -f "$SEC_DIR/exceptions.json" ] && PLAN_ARGS+=(--exceptions "$SEC_DIR/exceptions.json")
 model_files_present && PLAN_ARGS+=(--model-files); [ "$PARTIAL" = 1 ] && PLAN_ARGS+=(--partial)
@@ -182,7 +193,7 @@ ensure_image() { # <tag> <context-dir> [build-args...]
   local tag="$1" ctx="$2"; shift 2
   docker image inspect "$tag" >/dev/null 2>&1 || docker build -q -t "$tag" "$@" "$ctx" >/dev/null || { echo "failed to build $tag" >&2; return 1; }
 }
-ensure_scanner_image()      { ensure_image "$SCANNER_IMAGE" "$HERE/docker/scanner" --build-arg BANDIT_VERSION="$BANDIT_VERSION" --build-arg PIP_AUDIT_VERSION="$PIP_AUDIT_VERSION" --build-arg MODELSCAN_VERSION="$MODELSCAN_VERSION"; }
+ensure_scanner_image()      { ensure_image "$SCANNER_IMAGE" "$HERE/docker/scanner" --build-arg BANDIT_VERSION="$BANDIT_VERSION" --build-arg PIP_AUDIT_VERSION="$PIP_AUDIT_VERSION" --build-arg MODELSCAN_VERSION="$MODELSCAN_VERSION" --build-arg SCHEMATHESIS_VERSION="$SCHEMATHESIS_VERSION"; }
 ensure_node_scanner_image() { ensure_image "$SCANNER_NODE_IMAGE" "$HERE/docker/scanner-node"; }
 ensure_volume() { docker volume inspect "$1" >/dev/null 2>&1 || docker volume create "$1" >/dev/null; docker run --rm --user root --entrypoint chmod -v "$1:/v" "$2" 777 /v >/dev/null 2>&1; }
 add_manifest() { # <map-file> <report-file> <manifest>
@@ -205,11 +216,72 @@ run_trivy_fs() {
     "$TRIVY_IMAGE" fs --config /cfg/trivy.yaml --format json --output /out/trivy-fs.json --quiet /src 2>&1 | tail -2
   TOOLS+=(trivy-fs)
 }
+run_gitleaks_history() {
+  local max total note=""
+  max="${SEC_HISTORY_COMMITS:-$(python3 -I -c 'import json,sys;print(json.load(open(sys.argv[1])).get("history_scan",{}).get("max_commits",3000))' "$POLICY")}"
+  total="$(git -C "$REPO" rev-list --count HEAD 2>/dev/null || echo 0)"
+  log "gitleaks: secrets in git history ($total commits, newest $max scanned at most)"
+  [ "$(git -C "$REPO" rev-parse --is-shallow-repository 2>/dev/null)" = true ] && note="git history: shallow clone, so older commits were not scanned (check out with full history, e.g. actions/checkout fetch-depth: 0)"
+  [ "$total" -gt "$max" ] && note="${note:+$note; }git history: only the newest $max of $total commits were scanned (raise SEC_HISTORY_COMMITS)"
+  docker run --rm --user "$UIDGID" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src -v "$REPO:/src:ro" -v "$GITLEAKS_CFG:/cfg/gitleaks.toml:ro" \
+    -v "$HERE/configs/gitleaks:/cfg-default:ro" -v "$OUT/raw:/out" "$GITLEAKS_IMAGE" git /src --config /cfg/gitleaks.toml --log-opts="--max-count=$max" \
+    --report-format json --report-path /out/gitleaks-history.json --redact --no-banner --exit-code 0 2>&1 | tail -2
+  [ -n "$note" ] && printf '%s\n' "$note" > "$OUT/raw/gitleaks-history.note"
+  TOOLS+=(gitleaks-history)
+}
+run_sbom() {
+  log "sbom: CycloneDX software bill of materials (Trivy)"
+  ensure_volume mckesson-trivy-cache "$TRIVY_IMAGE"
+  docker run --rm --user "$UIDGID" -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache -v "$REPO:/src:ro" -v "$TRIVY_CFG:/cfg/trivy.yaml:ro" -v "$OUT/raw:/out" \
+    "$TRIVY_IMAGE" fs --config /cfg/trivy.yaml --scanners vuln --format cyclonedx --output /out/sbom.json --quiet /src 2>&1 | tail -2
+  [ -s "$OUT/raw/sbom.json" ] && cp "$OUT/raw/sbom.json" "$OUT/sbom.cdx.json"   # CycloneDX; kept next to the report for download
+  TOOLS+=(sbom)
+}
+run_workflow_scan() {
+  log "zizmor: GitHub Actions security (unpinned actions, script injection, excessive permissions)"
+  docker run --rm --user "$UIDGID" -v "$REPO:/src:ro" -w /src "$ZIZMOR_IMAGE" --format json --no-progress --offline . > "$OUT/raw/workflow-scan.tmp" 2> "$OUT/workflow-scan.log"
+  local rc=$?   # zizmor exits 10-14 when it has findings: only a missing/invalid JSON document is an error
+  if python3 -I -c 'import json,sys;sys.exit(0 if isinstance(json.load(open(sys.argv[1])),list) else 1)' "$OUT/raw/workflow-scan.tmp" 2>/dev/null; then mv "$OUT/raw/workflow-scan.tmp" "$OUT/raw/workflow-scan.json"; else rm -f "$OUT/raw/workflow-scan.tmp"; echo "zizmor produced no report (exit $rc), see $OUT/workflow-scan.log"; fi
+  TOOLS+=(workflow-scan)
+}
+run_k8s_posture() {
+  log "kubescape: Kubernetes manifest posture (NSA hardening framework)"
+  local tmp; tmp="$(mktemp -d)"; chmod 755 "$tmp"
+  while IFS= read -r f; do [ -n "$f" ] && { mkdir -p "$tmp/$(dirname "${f#"$REPO"/}")"; cp "$f" "$tmp/${f#"$REPO"/}"; }; done <<< "$K8S_FILES"
+  docker run --rm --user "$UIDGID" -e HOME=/tmp -v "$tmp:/src:ro" -v "$OUT/raw:/out" "$KUBESCAPE_IMAGE" scan framework nsa --format json --output /out/k8s-posture.json \
+    --logger error --verbose=false --submit=false /src > "$OUT/k8s-posture.log" 2>&1 || true
+  rm -rf "$tmp"
+  [ -s "$OUT/raw/k8s-posture.json" ] || echo "kubescape produced no report (it downloads its control definitions: is github.com reachable?), see $OUT/k8s-posture.log"
+  TOOLS+=(k8s-posture)
+}
+run_api_fuzz() {
+  log "schemathesis: API fuzzing from the OpenAPI spec $SEC_API_SPEC (QA/UAT only)"
+  ensure_scanner_image || return
+  local net=(); [ -n "${SEC_API_NETWORK:-$SEC_ZAP_NETWORK}" ] && net=(--network "${SEC_API_NETWORK:-$SEC_ZAP_NETWORK}")
+  docker run --rm "${net[@]}" -e API_TEST_TOKEN -v "$OUT/raw:/out" "$SCANNER_IMAGE" sh -c \
+    'schemathesis run "$0" --checks all --hypothesis-max-examples="$1" --hypothesis-suppress-health-check=all ${API_TEST_TOKEN:+-H "Authorization: Bearer $API_TEST_TOKEN"} --junit-xml=/out/schemathesis.xml' \
+    "$SEC_API_SPEC" "$SEC_FUZZ_EXAMPLES" > "$OUT/api-fuzz.log" 2>&1
+  grep -E 'passed|failed|errored' "$OUT/api-fuzz.log" | tail -1
+  python3 -I "$HERE/scripts/api_fuzz_report.py" --junit "$OUT/raw/schemathesis.xml" --spec "$SEC_API_SPEC" --out "$OUT/raw/api-fuzz.json" || echo "api-fuzz produced no report, see $OUT/api-fuzz.log"
+  TOOLS+=(api-fuzz)
+}
+run_exposure() {
+  log "exposure: TLS, headers, sensitive paths and open ports of $SEC_EXPOSURE_TARGETS (only systems you own)"
+  python3 -I "$HERE/scripts/exposure.py" --targets "$SEC_EXPOSURE_TARGETS" --out "$OUT/raw/exposure.json" || echo "exposure check failed"
+  TOOLS+=(exposure)
+}
+run_repo_posture() {
+  log "repo-posture: GitHub repository settings ($GH_SLUG)"
+  python3 -I "$HERE/scripts/repo_posture.py" --repo "$GH_SLUG" --root "$REPO" --out "$OUT/raw/repo-posture.json" || echo "repo-posture check failed (token without read access?)"
+  TOOLS+=(repo-posture)
+}
 run_trivy_image() {
   log "trivy: container image $SEC_IMAGE"
   ensure_volume mckesson-trivy-cache "$TRIVY_IMAGE"
   docker run --rm -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache -v /var/run/docker.sock:/var/run/docker.sock \
-    -v "$OUT/raw:/out" "$TRIVY_IMAGE" image --format json --output /out/trivy-image.json --quiet "$SEC_IMAGE" 2>&1 | tail -2
+    -v "$OUT/raw:/out" "$TRIVY_IMAGE" image --scanners vuln,secret,license --format json --output /out/trivy-image.json --quiet "$SEC_IMAGE" 2>&1 | tail -2
+  docker run --rm -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache -v /var/run/docker.sock:/var/run/docker.sock -v "$OUT/raw:/out" "$TRIVY_IMAGE" image \
+    --compliance docker-cis-1.6.0 --format json --output /out/trivy-image-cis.json --quiet "$SEC_IMAGE" >/dev/null 2>&1 || true   # CIS Docker benchmark (advisory)
   TOOLS+=(trivy-image)
 }
 run_semgrep() {
@@ -363,15 +435,20 @@ run_sonar() {
   curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=$key&resolved=false&ps=500" > "$OUT/raw/sonarqube.json" || rm -f "$OUT/raw/sonarqube.json"
   curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=$key" > "$OUT/raw/sonarqube-qualitygate.json" || true
 }
+# Authenticated scans: ZAP_AUTH_TOKEN (sent as "Authorization: Bearer <token>") or ZAP_AUTH_HEADER ("Name: value"), both CI secrets.
+# They reach the container through the environment (never the command line) and become a ZAP replacer rule on every request.
+ZAP_WRAP='hn=""; if [ -n "$ZAP_AUTH_TOKEN" ]; then hn=Authorization; hv="Bearer $ZAP_AUTH_TOKEN"; elif [ -n "$ZAP_AUTH_HEADER" ]; then hn="${ZAP_AUTH_HEADER%%:*}"; hv="${ZAP_AUTH_HEADER#*:}"; hv="${hv# }"; fi
+if [ -n "$hn" ]; then hv="${hv// /\\ }"; zo="-config replacer.full_list(0).description=secscan-auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=$hn -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$hv"; exec "$@" -z "$zo"; fi
+exec "$@"'
 run_zap() {
-  log "OWASP ZAP $SEC_ZAP_MODE scan against $SEC_ZAP_URL (authorised, non-production targets only)"
+  log "OWASP ZAP $SEC_ZAP_MODE scan against $SEC_ZAP_URL (authorised, non-production targets only)$([ -n "${ZAP_AUTH_TOKEN:-}${ZAP_AUTH_HEADER:-}" ] && echo ', authenticated')"
   TOOLS+=(zap)
   chmod 777 "$OUT/raw"   # the ZAP image runs as its own user and writes its report here
   local netargs=(); [ -n "$SEC_ZAP_NETWORK" ] && netargs=(--network "$SEC_ZAP_NETWORK")
   local rules=(); [ -f "$SEC_DIR/zap-rules.tsv" ] && rules=(-c /zap/wrk/zap-rules.tsv) && cp "$SEC_DIR/zap-rules.tsv" "$OUT/raw/zap-rules.tsv"
   if [ "$SEC_ZAP_MODE" = api ]; then
     : "${SEC_ZAP_OPENAPI:?--zap-mode api needs --zap-openapi URL}"
-    docker run --rm "${netargs[@]}" -v "$OUT/raw:/zap/wrk:rw" "$ZAP_IMAGE" zap-api-scan.py -t "$SEC_ZAP_OPENAPI" -f openapi \
+    docker run --rm "${netargs[@]}" -e ZAP_AUTH_TOKEN -e ZAP_AUTH_HEADER -v "$OUT/raw:/zap/wrk:rw" "$ZAP_IMAGE" bash -c "$ZAP_WRAP" zap zap-api-scan.py -t "$SEC_ZAP_OPENAPI" -f openapi \
       -J zap.json -I "${rules[@]}" > "$OUT/zap.log" 2>&1
   elif [ "$SEC_ZAP_MODE" = full ]; then
     # one ACTIVE scan per seed URL, in parallel (ZAP is memory hungry: at most 3 at a time)
@@ -379,7 +456,7 @@ run_zap() {
     : > "$OUT/zap.log"
     for seed in ${SEC_ZAP_URL//,/ }; do
       i=$((i+1))
-      docker run --rm "${netargs[@]}" -v "$OUT/raw:/zap/wrk:rw" "$ZAP_IMAGE" zap-full-scan.py -t "$seed" -J "zap-$i.json" -I -m 1 \
+      docker run --rm "${netargs[@]}" -e ZAP_AUTH_TOKEN -e ZAP_AUTH_HEADER -v "$OUT/raw:/zap/wrk:rw" "$ZAP_IMAGE" bash -c "$ZAP_WRAP" zap zap-full-scan.py -t "$seed" -J "zap-$i.json" -I -m 1 \
         "${rules[@]}" > "$OUT/zap-$i.log" 2>&1 &
       running=$((running+1)); [ "$running" -ge 3 ] && { wait -n; running=$((running-1)); }
     done
@@ -387,7 +464,7 @@ run_zap() {
     cat "$OUT"/zap-*.log >> "$OUT/zap.log" 2>/dev/null
     [ -n "$(ls "$OUT"/raw/zap-*.json 2>/dev/null)" ] || echo "ZAP produced no report (see $OUT/zap-*.log)"
   else
-    docker run --rm "${netargs[@]}" -v "$OUT/raw:/zap/wrk:rw" "$ZAP_IMAGE" zap-baseline.py -t "$SEC_ZAP_URL" \
+    docker run --rm "${netargs[@]}" -e ZAP_AUTH_TOKEN -e ZAP_AUTH_HEADER -v "$OUT/raw:/zap/wrk:rw" "$ZAP_IMAGE" bash -c "$ZAP_WRAP" zap zap-baseline.py -t "$SEC_ZAP_URL" \
       -J zap.json -I "${rules[@]}" > "$OUT/zap.log" 2>&1
   fi
   grep -E '^FAIL-NEW|^WARN-NEW' "$OUT/zap.log" | sort | uniq -c | head -12
@@ -396,7 +473,12 @@ run_zap() {
 
 # ---- run the tools chosen above ----
 runs gitleaks         && run_gitleaks
+runs gitleaks-history && run_gitleaks_history
 runs trivy-fs         && run_trivy_fs
+runs sbom             && run_sbom
+runs workflow-scan    && run_workflow_scan
+runs k8s-posture      && run_k8s_posture
+runs repo-posture     && run_repo_posture
 runs semgrep          && run_semgrep
 runs bandit           && run_bandit
 runs pip-audit        && run_pip_audit
@@ -408,10 +490,12 @@ runs dependency-check && run_depcheck
 runs sonarqube        && run_sonar
 runs trivy-image      && run_trivy_image
 runs zap              && run_zap
+runs api-fuzz         && run_api_fuzz
+runs exposure         && run_exposure
 runs redteam          && run_redteam
 
 # ---- gate ----
-ARGS=(--out "$OUT" --tools "$(IFS=,; echo "${TOOLS[*]}")" --policy "$POLICY" --gate "$SEC_GATE" --root "$REPO" --target "$NAME" --plan "$OUT/plan.json")
+ARGS=(--out "$OUT" --tools "$(IFS=,; echo "${TOOLS[*]}")" --policy "$POLICY" --gate "$SEC_GATE" --root "$REPO" --target "$NAME" --plan "$OUT/plan.json" --crosswalk "$HERE/configs/compliance/crosswalk.json")
 [ -n "$SEC_EXCLUDE_PATHS" ] && ARGS+=(--exclude "$SEC_EXCLUDE_PATHS")
 [ -f "$SEC_DIR/exceptions.json" ] && ARGS+=(--exceptions "$SEC_DIR/exceptions.json")
 if [ "$WRITE_BASELINE" = 1 ]; then

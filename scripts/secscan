@@ -7,6 +7,7 @@
 #   secscan baseline          record today's findings as "existing" so only NEW High/Critical findings block (legacy apps)
 #   secscan config show       which tools run on this repo and why (preset, switches, required-tool lock, waivers)
 #   secscan config set KEY VALUE   change one setting in .security/config.env safely, e.g. config set SEC_PRESET standard | config set SEC_BANDIT off
+#   secscan tickets [--apply]  create GitHub / Jira / Azure DevOps tickets for new + overdue Critical/High findings (dry run unless --apply; see docs/dashboard.md)
 #   secscan publish           send the latest report to the central dashboard (CI does this automatically when SEC_DASHBOARD_URL is set)
 #   secscan open              open the latest HTML report
 #   secscan pull              download/build all scanner images now (so the first scan, or CI, is not slow)
@@ -61,7 +62,7 @@ cmd_doctor() {
 cmd_pull() {
   echo "Pulling scanner images (one-time, a few GB)..."
   local img; for img in "$TRIVY_IMAGE" "$GITLEAKS_IMAGE" "$SEMGREP_IMAGE"; do docker pull -q "$img" >/dev/null && ok "${img%%@*}" || bad "failed: $img"; done
-  docker build -q -t "$SCANNER_IMAGE" --build-arg BANDIT_VERSION="$BANDIT_VERSION" --build-arg PIP_AUDIT_VERSION="$PIP_AUDIT_VERSION" "$ROOT/docker/scanner" >/dev/null && ok "$SCANNER_IMAGE (bandit, pip-audit)"
+  docker build -q -t "$SCANNER_IMAGE" --build-arg BANDIT_VERSION="$BANDIT_VERSION" --build-arg PIP_AUDIT_VERSION="$PIP_AUDIT_VERSION" --build-arg MODELSCAN_VERSION="$MODELSCAN_VERSION" --build-arg SCHEMATHESIS_VERSION="$SCHEMATHESIS_VERSION" "$ROOT/docker/scanner" >/dev/null && ok "$SCANNER_IMAGE (bandit, pip-audit, modelscan, schemathesis)"
   docker build -q -t "$SCANNER_NODE_IMAGE" "$ROOT/docker/scanner-node" >/dev/null && ok "$SCANNER_NODE_IMAGE (eslint, npm)"
   echo "Optional (only if you use them): docker pull $ZAP_IMAGE  |  $SONAR_SCANNER_IMAGE  |  $DEPCHECK_IMAGE"
 }
@@ -134,6 +135,8 @@ case "$c" in
   doctor)   cmd_doctor "$@";;
   pull)     cmd_pull;;
   open)     cmd_open;;
+  tickets)  rep="$(sec_dir)/reports/latest"; [ -d "$rep" ] || rep=reports/latest
+            exec python3 -I "$ROOT/scripts/tickets.py" --report "$rep" "$@";;
   publish)  exec "$SCAN" $(target_args) --publish-latest;;
   config)   cmd_config "$@";;
   disable)  cmd_disable "$@";;

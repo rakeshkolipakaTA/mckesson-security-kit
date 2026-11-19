@@ -1,13 +1,20 @@
 # Option B (central framework, no kit in your repo): .github/workflows/security.yml
 # Your repo only needs this file (+ optionally .security/config.env and exceptions.json).
+# The reusable workflow is pinned to a commit (a tag can be moved); update the SHA when a new release is announced (Dependabot's
+# "github-actions" ecosystem does it for you).
 name: security
 on:
   pull_request:
   push:
     branches: [main, master]
+permissions:
+  contents: read
 jobs:
   security:
-    uses: rakeshkolipakaTA/mckesson-security-kit/.github/workflows/security-scan-reusable.yml@v1
+    uses: rakeshkolipakaTA/mckesson-security-kit/.github/workflows/security-scan-reusable.yml@b1751a0098d61c6822541dbc3dd0f4464fc42bd5  # main at the time of writing; use a release SHA once one exists
     with:
       enforce: false          # flip to true when the team is ready to block PRs
-    secrets: inherit
+      framework-ref: b1751a0098d61c6822541dbc3dd0f4464fc42bd5   # the same commit: the scanner scripts it checks out are pinned too
+    secrets:                  # pass only what is needed (delete the ones you do not use)
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}

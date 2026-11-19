@@ -6,7 +6,7 @@ POLICY = os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "p
 
 
 def A(**kw):
-    d = dict(policy=POLICY, preset="starter", profiles=["python"], modes="", exceptions=None, image="", zap_url="", redteam_url="", model_files=False, partial=False)
+    d = dict(policy=POLICY, preset="starter", profiles=["python"], modes="", exceptions=None, image="", zap_url="", redteam_url="", model_files=False, partial=False, facts=[], api_spec="", exposure_targets="")
     d.update(kw)
     return argparse.Namespace(**d)
 
@@ -17,7 +17,7 @@ def runs(p):
 
 def test_defaults_python():
     p = tp.plan(A())
-    assert runs(p) == {"gitleaks", "semgrep", "trivy-fs", "bandit", "pip-audit"}
+    assert runs(p) == {"gitleaks", "semgrep", "trivy-fs", "sbom", "bandit", "pip-audit"}
     assert "not a Node" in p["tools"]["eslint"]["reason"]
 
 
@@ -98,6 +98,18 @@ def test_only_explicit_off_is_marked_explicit():
     p = tp.plan(A(modes="bandit=off"))
     assert p["tools"]["bandit"]["explicit"] and not p["tools"]["sonarqube"]["explicit"]   # sonarqube is off by preset default only
     assert not p["tools"]["gitleaks"]["explicit"]
+
+
+def test_new_tools_follow_their_facts():
+    base = runs(tp.plan(A()))
+    assert "sbom" in base and not base & {"gitleaks-history", "workflow-scan", "k8s-posture", "api-fuzz", "exposure", "repo-posture"}
+    r = runs(tp.plan(A(facts=["git", "workflows", "k8s", "ghrepo"], api_spec="http://x/openapi.json", exposure_targets="https://qa.example")))
+    assert {"gitleaks-history", "workflow-scan", "k8s-posture", "repo-posture", "api-fuzz", "exposure"} <= r
+
+
+def test_new_tools_can_be_switched_and_on_without_target_is_reported():
+    assert "sbom" not in runs(tp.plan(A(modes="sbom=off"))) and "gitleaks-history" not in runs(tp.plan(A(facts=["git"], modes="history=off")))
+    assert tp.plan(A(modes="api-fuzz=on"))["errors"] and tp.plan(A(modes="exposure=on"))["errors"]
 
 
 if __name__ == "__main__":

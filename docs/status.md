@@ -4,10 +4,10 @@
 | Area | Evidence |
 |---|---|
 | Tools: gitleaks, Trivy (fs + image), Semgrep, Bandit, pip-audit, `npm audit`, ESLint security, SonarQube, ZAP (baseline/api/full) | fixtures `fastapi-sample`, `node-sample`, `java-sample`, `vulnerable-python`; a real small repo and a real larger private application repo |
-| Gate: enforce/report-only, baseline, approved + expired exceptions, fail-closed, cross-tool dedupe, stable ids | `scripts/selftest.sh` (16 checks) + `scripts/test_gate.py` (19 unit tests) + `scripts/test_toolplan.py` (13 unit tests) |
+| Gate: enforce/report-only, baseline, approved + expired exceptions, fail-closed, cross-tool dedupe, stable ids | `scripts/selftest.sh` (21 checks) + `scripts/test_gate.py` (28 unit tests) + `scripts/test_toolplan.py` (13 unit tests) |
 | Developer journey on python, node, java, clean: `init` > `doctor` > first scan > enforce > upgrade keeps edits | `scripts/test-onboarding.sh` (83 checks) |
 | Config: presets, per-tool `auto/on/off`, required-tool lock, time-boxed tool waivers, `SEC_EXCLUDE_PATHS`, `config show/set` | `test_toolplan.py`, `test-onboarding.sh` (switches, lock, waivers, unsafe values), `test_gate.py` |
-| Central dashboard (portfolio + repo pages, ingest API, login, hostile-input handling) and CI publisher; deployed on this server with SonarQube | `scripts/test_dashboard.py` (10 tests); live on `:8090` with real scan data from 5 repos incl. the pilot branch |
+| Central dashboard (portfolio + repo pages, ingest API, login, hostile-input handling) and CI publisher; deployed on this server with SonarQube | `scripts/test_dashboard.py` (20 tests); live on `:8090` with real scan data from 5 repos incl. the pilot branch |
 | Package: `pip install` into a clean venv, thin `init`, self-installing launcher pinned by `secscan.lock`, `disable/enable/upgrade/uninstall/reinstall`, vendored mode | `scripts/test-package.sh` (46 checks; one real scan) |
 | **Real GitHub Actions run** on a private application repo (a pilot branch, vendored kit, starter preset) | Run succeeded in 4m10s; report artifact produced. Found one real bug (npm audit failed on a peer-dependency conflict, now fixed + regression test) |
 | `config.env` is parsed, never executed; project `policy.json` is ignored | same test (malicious `config.env`, relaxed policy attempt) |
@@ -21,6 +21,12 @@
 - **Template, not run end to end**: DeepTeam (wiring verified by `--dry-run` for 5 frameworks; no LLM available for a full run) and promptfoo (not run at all).
 - **Not provided**: code-execution sandbox, vault/rotation, IdP/token exchange, WORM audit storage, runtime detection, output-integrity/lineage checks, LLM09 misinformation.
 - **Limits**: tests use a mock LLM (they prove application controls and the harness, not a real model's jailbreak resistance); the model registry is example content; injection screening is heuristic (RT-INJ-03 fails on the hardened sample on purpose).
+
+## Penetration-test gaps (found when the programme was reviewed against a VAPT checklist)
+Not built yet, in the roadmap as *Planned*: Nmap port and service discovery, Nuclei CVE and misconfiguration templates, testssl.sh deep TLS, a BOLA / IDOR authorisation test pack, session and token checks (JWT, cookies, rate limits), subdomain and DNS-email checks, mobile (MobSF). Manual penetration test, red team, social engineering and load / denial-of-service testing need a human engagement; the process kit has the templates, but no test has been commissioned. See [the point-of-view deck](secscan-pov-presentation.html).
+
+## Latest full regression (2026-11-19)
+selftest 21, onboarding 83, package 46, new-tools 22, e2e-agent 12, unit suites (gate 28, tool plan 16, dashboard 20, tickets 11, templates 10, tools 7), agentic library 24 + 54, Docker sandbox 17, Vault 8: all pass (379 checks). The one failure seen during the run (an unpinned action in the cloud-posture template) was fixed and re-tested.
 
 ## NOT validated yet
 - **Real CI runs**: only the GitHub Actions PR workflow has run on a real runner (vendored mode, push trigger). Thin mode on a runner (needs the package published), pull_request events, the release/DAST workflows, Jenkins and Azure DevOps have not; the Azure YAML parses but was not run; the Jenkins snippets/Groovy step were not syntax-checked at all. The reusable workflow needs `<ORG>` replaced and the templates repo published.

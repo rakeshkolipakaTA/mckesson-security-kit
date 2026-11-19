@@ -1,4 +1,4 @@
-.PHONY: platform-up test-package e2e-agent test-onboarding e2e-fastapi sonar-up sonar-down selftest dashboard build-scanner
+.PHONY: test-newtools test-agentic-docker platform-up test-package e2e-agent test-onboarding e2e-fastapi sonar-up sonar-down selftest dashboard build-scanner
 platform-up:    ## SonarQube + dashboard on this server (see docs/dashboard.md); HOST=<address> to set the URLs it prints
 	scripts/platform-up.sh $(if $(HOST),--host $(HOST),)
 sonar-up:        ## start central SonarQube on http://localhost:9000
@@ -10,9 +10,15 @@ selftest:        ## prove the gate logic (~2 min, needs Docker + internet for th
 dashboard:
 	scripts/aggregate.py
 build-scanner:
-	. ./versions.env && docker build -t $$SCANNER_IMAGE --build-arg BANDIT_VERSION=$$BANDIT_VERSION --build-arg PIP_AUDIT_VERSION=$$PIP_AUDIT_VERSION docker/scanner
+	scripts/secscan pull
 e2e-fastapi:     ## build+run the vulnerable FastAPI sample and scan it with every layer incl. ZAP (~6 min)
 	scripts/e2e-fastapi.sh
+test-newtools:  ## real-container test of the newer checks: git history, SBOM, workflows, K8s, fuzzing, exposure, SLA (~3 min)
+	scripts/test-newtools.sh
+
+test-agentic-docker: ## sandbox + Vault tests that need Docker (pulls the Vault image the first time, ~400 MB)
+	python3 -W ignore -I agentic/tests/test_sandbox_docker.py && python3 -W ignore -I agentic/tests/test_vault_docker.py
+
 test-package: ## build + pip-install into a clean venv; init/shim/disable/uninstall (~3 min, needs network + Docker)
 	scripts/test-package.sh
 

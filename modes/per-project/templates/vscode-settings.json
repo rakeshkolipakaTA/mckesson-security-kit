@@ -1,0 +1,5 @@
+{
+  "files.watcherExclude": { "**/.security/reports/**": true },
+  "search.exclude": { "**/.security/reports": true },
+  "files.exclude": { "**/.security/reports/*/raw": true }
+}

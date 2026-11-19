@@ -220,3 +220,39 @@ def agent_ok(llm, budget):
         budget.step()
         out = llm.invoke("x")
         print(out)
+
+
+import hmac
+
+
+def verify(request, expected_sig, token, stored_token, user_password, saved_password):
+    # ruleid: mckesson-agent-non-constant-time-compare
+    if request.headers["X-Signature"] == expected_sig:
+        pass
+    # ruleid: mckesson-agent-non-constant-time-compare
+    if token == stored_token:
+        pass
+    # ruleid: mckesson-agent-non-constant-time-compare
+    if user_password != saved_password:
+        pass
+    # ruleid: mckesson-agent-non-constant-time-compare
+    if computed_hmac == received:
+        pass
+    # ok: mckesson-agent-non-constant-time-compare
+    if hmac.compare_digest(token, stored_token):
+        pass
+    # ok: mckesson-agent-non-constant-time-compare
+    if token is None:
+        pass
+    # ok: mckesson-agent-non-constant-time-compare
+    if token == "":
+        pass
+    # ok: mckesson-agent-non-constant-time-compare
+    if len(token) == 32:
+        pass
+    # ok: mckesson-agent-non-constant-time-compare
+    if user_name == other_name:
+        pass
+    # ok: mckesson-agent-non-constant-time-compare
+    if token_type == "bearer":
+        pass

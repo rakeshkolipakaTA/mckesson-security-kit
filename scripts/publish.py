@@ -25,6 +25,15 @@ def git(root, *args):
         return ""
 
 
+def sla_days():
+    """sla_days from the kit's central policy.json (scripts/ and configs/ sit side by side in the kit, the package and the checkout)."""
+    try:
+        pol = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "configs", "policies", "policy.json")))
+        return {k: v for k, v in pol.get("sla_days", {}).items() if isinstance(v, int)}
+    except (OSError, ValueError):
+        return {}
+
+
 def ci_context(root):
     env = os.environ
     if env.get("GITHUB_ACTIONS"):
@@ -66,8 +75,10 @@ def main():
         fail(f"no readable report in {a.report}: {ex}")
     repo, branch, commit, run = ci_context(a.root)
     findings.sort(key=lambda f: (SEV.index(f["severity"]) if f.get("severity") in SEV else 9))
-    slim = [{k: f.get(k) for k in ("severity", "tool", "rule", "location", "title", "fix", "new", "excepted")} for f in findings[:1500]]
-    body = json.dumps({"repo": a.repo or repo or summary.get("target"), "branch": branch, "commit": commit, "run_url": run, "summary": summary, "findings": slim}).encode()
+    slim = [{k: f.get(k) for k in ("severity", "tool", "rule", "location", "title", "fix", "new", "excepted", "fingerprint")} for f in findings[:1500]]
+    summary["sla_days"] = sla_days()   # the central policy's remediation SLAs, so the dashboard can track overdue findings
+    body = json.dumps({"repo": a.repo or repo or summary.get("target"), "branch": branch, "commit": commit, "run_url": run, "summary": summary,
+                       "findings": slim, "findings_total": len(findings)}).encode()
     req = urllib.request.Request(a.url.rstrip("/") + "/api/ingest", data=body, method="POST",
                                  headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "User-Agent": "secscan-publish"})
     try:

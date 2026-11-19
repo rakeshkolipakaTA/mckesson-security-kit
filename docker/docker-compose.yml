@@ -35,6 +35,12 @@ services:
       DASHBOARD_INGEST_TOKEN: ${DASHBOARD_INGEST_TOKEN:?run scripts/platform-up.sh}
       DASHBOARD_USER: ${DASHBOARD_USER:-secscan}
       SONAR_PUBLIC_URL: ${SONAR_PUBLIC_URL:-}
+      DASHBOARD_ALERT_WEBHOOK: ${DASHBOARD_ALERT_WEBHOOK:-}       # optional: Slack/Teams-compatible incoming webhook (docs/dashboard.md)
+      DASHBOARD_ALERT_MIN: ${DASHBOARD_ALERT_MIN:-critical}
+      DASHBOARD_ALERT_BRANCHES: ${DASHBOARD_ALERT_BRANCHES:-main,master}
+      DASHBOARD_PUBLIC_URL: ${DASHBOARD_PUBLIC_URL:-}
+      DASHBOARD_SLA_DAYS: ${DASHBOARD_SLA_DAYS:-}
+      STALE_DAYS: ${STALE_DAYS:-14}
     ports: ["${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT:-8090}:8090"]
     volumes: [dashboard_data:/data]
     restart: unless-stopped

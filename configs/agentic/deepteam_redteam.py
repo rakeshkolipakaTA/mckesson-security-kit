@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LLM-DRIVEN red teaming of your agent with DeepTeam (https://www.trydeepteam.com), mapped to the frameworks on the Agentic Security slides.
+"""LLM-DRIVEN red teaming of your agent with DeepTeam (https://www.trydeepteam.com), mapped to the frameworks on the Agentic Security slides (OWASP Agents/LLM, NIST AI RMF, MITRE ATLAS, EU AI Act, BeaverTails, Aegis).
 
 TEMPLATE. Verified against deepteam==1.0.10: imports, framework names, and the HTTP target wiring (`--dry-run` calls your agent once and needs no LLM).
 NOT verified here: a full run, because it needs an attacker/judge LLM and none was available. Read the warnings first.
@@ -25,7 +25,7 @@ os.environ.setdefault("DEEPEVAL_GRPC_LOGGING", "NOT_SET")
 
 from deepteam import red_team                                         # noqa: E402
 from deepteam.attacks.single_turn import Base64, Leetspeak, PromptInjection   # noqa: E402
-from deepteam.frameworks import MITRE, NIST, OWASPTop10, OWASP_ASI_2026, EUAIAct   # noqa: E402
+from deepteam.frameworks import MITRE, NIST, Aegis, BeaverTails, OWASPTop10, OWASP_ASI_2026, EUAIAct   # noqa: E402
 from deepteam.test_case import RTTurn                                 # noqa: E402
 from deepteam.vulnerabilities import (BFLA, BOLA, AgentIdentityAbuse, ExcessiveAgency, ExploitToolAgent, GoalTheft,   # noqa: E402
                                       IndirectInstruction, PIILeakage, PromptLeakage)
@@ -35,7 +35,8 @@ CHAT_PATH = os.environ.get("AGENT_CHAT_PATH", "/chat")
 MESSAGE_FIELD = os.environ.get("AGENT_MESSAGE_FIELD", "message")
 RESPONSE_FIELD = os.environ.get("AGENT_RESPONSE_FIELD", "response")
 TOKEN = os.environ.get("REDTEAM_TOKEN")
-FRAMEWORKS = {"owasp-asi": OWASP_ASI_2026, "owasp-llm": OWASPTop10, "mitre": MITRE, "nist": NIST, "eu-ai-act": EUAIAct}
+FRAMEWORKS = {"owasp-asi": OWASP_ASI_2026, "owasp-llm": OWASPTop10, "mitre": MITRE, "nist": NIST, "eu-ai-act": EUAIAct,
+              "beavertails": BeaverTails, "aegis": Aegis}   # the last two are content-safety datasets (downloaded at run time)
 
 
 def target(prompt: str, turns=None) -> RTTurn:

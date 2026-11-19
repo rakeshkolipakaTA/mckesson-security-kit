@@ -11,6 +11,11 @@ scan() { scripts/scan.sh "$@" >"$T/last.log" 2>&1; echo $?; }
 echo "0. gate identity/dedupe unit tests"
 python3 -I scripts/test_gate.py >"$T/unit.log" 2>&1; check "unit tests (alias order, tool set, per-manifest identity)" 0 $?; cp "$T/unit.log" "$T/last.log"
 python3 -I scripts/test_toolplan.py >"$T/plan.log" 2>&1; check "tool-plan tests (presets, required-tool lock, waivers)" 0 $?
+python3 -I scripts/test_tools.py >"$T/tools.log" 2>&1; check "helper tools (API fuzz report, exposure, repo posture) against mock servers" 0 $?; cp "$T/tools.log" "$T/last.log"
+python3 -I scripts/test_tickets.py >"$T/tickets.log" 2>&1; check "ticketing (GitHub / Jira / Azure) against mock servers" 0 $?; cp "$T/tickets.log" "$T/last.log"
+python3 -I scripts/test_platform_templates.py >"$T/ptpl.log" 2>&1; check "platform templates (Dependabot, workflows, process kit, SLA text matches policy)" 0 $?; cp "$T/ptpl.log" "$T/last.log"
+python3 -W ignore -I agentic/tests/test_agentsec_extra.py >"$T/agentx.log" 2>&1; check "agentsec extras (output integrity, classification, retention, secrets, PIP/PAP)" 0 $?; cp "$T/agentx.log" "$T/last.log"
+python3 -W ignore -I agentic/tests/test_sandbox_docker.py >"$T/sandbox.log" 2>&1; check "agent code sandbox contains hostile code (real Docker)" 0 $?; cp "$T/sandbox.log" "$T/last.log"
 python3 -I scripts/test_dashboard.py >"$T/dash.log" 2>&1; check "dashboard + publisher tests (auth, hostile input, ingest, views)" 0 $?; cp "$T/dash.log" "$T/last.log"
 echo "0b. agentic controls: runtime library unit tests + Semgrep agent-rule tests"
 python3 -W ignore -I agentic/tests/test_agentsec.py >"$T/agentsec.log" 2>&1; check "agentsec unit tests" 0 $?; cp "$T/agentsec.log" "$T/last.log"

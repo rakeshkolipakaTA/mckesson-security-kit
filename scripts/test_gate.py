@@ -186,6 +186,96 @@ def test_tool_waivers_are_not_treated_as_finding_exceptions():
     assert expired == [] and not kept[0].get("excepted")
 
 
+def test_license_policy_deny_review_unknown_and_permissive():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    assert gate.license_sev("AGPL-3.0-only", pol) == "HIGH" and gate.license_sev("GPL-2.0-or-later", pol) == "MEDIUM"
+    assert gate.license_sev("MIT", pol) is None and gate.license_sev("Apache-2.0", pol) is None
+    assert gate.license_sev("", pol) == "LOW" and gate.license_sev("UNKNOWN", pol) == "LOW"
+
+
+def test_trivy_licence_findings_are_parsed():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    d = {"Results": [{"Target": "package-lock.json", "Licenses": [{"PkgName": "x", "Name": "AGPL-3.0"}, {"PkgName": "y", "Name": "MIT"}]}]}
+    f = gate.f_trivy(d, pol, "/r", "trivy-fs")
+    assert len(f) == 1 and f[0]["category"] == "License" and f[0]["severity"] == "HIGH"
+
+
+def test_history_secrets_are_grouped_and_only_history_only_ones_survive():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    d = [{"RuleID": "aws", "File": "a.env", "Commit": "c1" * 20, "Date": "2024-01-02T00:00:00Z", "Description": "AWS key", "StartLine": 1},
+         {"RuleID": "aws", "File": "a.env", "Commit": "c2" * 20, "Date": "2024-03-02T00:00:00Z", "Description": "AWS key", "StartLine": 1},
+         {"RuleID": "gh", "File": "b.py", "Commit": "c3" * 20, "Date": "2024-02-02T00:00:00Z", "Description": "token", "StartLine": 4}]
+    g = gate.f_gitleaks_history(d, pol, "/r")
+    assert len(g) == 2 and "2 commit(s)" in [x for x in g if x["rule"] == "aws"][0]["title"] and "first c1c1c1c1 on 2024-01-02" in [x for x in g if x["rule"] == "aws"][0]["title"]
+    import tempfile
+    raw = tempfile.mkdtemp(); json.dump(d, open(raw + "/gitleaks-history.json", "w")); json.dump([{"RuleID": "gh", "File": "b.py", "StartLine": 4, "Secret": "xx"}], open(raw + "/gitleaks.json", "w"))
+    f, st = gate.collect(raw, ["gitleaks", "gitleaks-history"], pol, "/r")
+    assert st == {"gitleaks": "ok", "gitleaks-history": "ok"} and sorted((x["tool"], x["rule"]) for x in f) == [("gitleaks", "gh"), ("gitleaks-history", "aws")]
+
+
+def test_baseline_dates_are_kept_and_overdue_findings_block_again():
+    import datetime as dt2, tempfile
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    old = (dt2.date.today() - dt2.timedelta(days=30)).isoformat()
+    f = lambda sev: {"fps": ["x" + sev], "severity": sev, "rule": "r", "path": "p", "tool": "t", "location": "l"}
+    bl = {"xHIGH": old, "xCRITICAL": old, "xMEDIUM": old}
+    hi, cr, me = f("HIGH"), f("CRITICAL"), f("MEDIUM")
+    blocking = gate.evaluate([hi, cr, me], pol["gates"]["pr"], bl, pol["sla_days"])
+    assert hi in blocking and hi["overdue"] and hi["age_days"] == 30          # High older than its 14-day SLA blocks again
+    assert me not in blocking and not me.get("overdue")                          # Medium is within its 60 days
+    young = {"xHIGH": dt2.date.today().isoformat()}
+    h2 = f("HIGH")
+    assert h2 not in gate.evaluate([h2], pol["gates"]["pr"], young, pol["sla_days"])
+    undated = f("HIGH")
+    assert undated not in gate.evaluate([undated], pol["gates"]["pr"], {"xHIGH": None}, pol["sla_days"])   # old list-style baseline: never ages
+    p = os.path.join(tempfile.mkdtemp(), "b.json"); json.dump({"xHIGH": old}, open(p, "w"))
+    assert gate.load_baseline(p) == {"xHIGH": old}
+    json.dump(["a", "b"], open(p, "w")); assert gate.load_baseline(p) == {"a": None, "b": None}
+
+
+def test_crosswalk_assigns_controls_and_summarises():
+    cw = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "compliance", "crosswalk.json")))
+    fs = [{"tool": "redteam", "rule": "RT-AUTH-02", "category": "AI red team", "severity": "HIGH"}, {"tool": "gitleaks", "rule": "x", "category": "Secrets", "severity": "HIGH"},
+          {"tool": "semgrep", "rule": "mckesson-agent-guardrail-fail-open-function", "category": "SAST", "severity": "MEDIUM"}]
+    gate.assign_controls(fs, cw)
+    assert fs[0]["controls"] == ["P1-AUTHZ"] and fs[1]["controls"] == ["P5-SECRETS"] and "P3-GUARDRAIL" in fs[2]["controls"]
+    sm = {x["control"]: x for x in gate.crosswalk_summary(fs, cw)}
+    assert sm["P1-AUTHZ"]["counts"]["HIGH"] == 1 and sm["P1-AUTHZ"]["standards"]["OWASP LLM Top 10"].startswith("LLM02")
+
+
+def test_sbom_parser_counts_components_and_simple_tool_findings():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    assert gate.f_sbom({"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [{"type": "library", "licenses": [1]}, {"type": "library"}]}) == []
+    assert gate.SBOM_INFO["components"] == 2 and gate.SBOM_INFO["with_license"] == 1
+    f = gate.f_simple({"findings": [{"severity": "high", "rule": "EXP-1", "title": "t", "location": "https://x"}]}, "exposure", "Exposure", pol)
+    assert f[0]["severity"] == "HIGH" and f[0]["category"] == "Exposure"
+
+
+def test_cis_compliance_controls_become_capped_advisory_findings():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    f = gate.f_cis({"SummaryControls": [{"ID": "4.1", "Name": "Ensure a user", "Severity": "HIGH", "TotalFail": 1}, {"ID": "4.6", "Name": "x", "Severity": "LOW", "TotalFail": 0},
+                                        {"ID": "5.1", "Name": "y", "Severity": "LOW", "TotalFail": 2}]}, "trivy-image", pol)
+    assert [(x["rule"], x["severity"]) for x in f] == [("CIS-DOCKER-4.1", "MEDIUM"), ("CIS-DOCKER-5.1", "LOW")]
+
+
+def test_kubescape_findings_are_advisory_one_level_below():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    d = {"resources": [{"resourceID": "r1", "source": {"path": "/src/k8s", "relativePath": "d.yaml"}}], "summaryDetails": {"controls": {"C-1": {"remediation": "set X"}}},
+         "results": [{"resourceID": "r1", "controls": [{"controlID": "C-1", "name": "Non-root", "severity": "High", "status": {"status": "failed"}},
+                                                       {"controlID": "C-2", "name": "ok", "severity": "High", "status": {"status": "passed"}}]}]}
+    f = gate.f_kubescape(d, pol, "/r")
+    assert len(f) == 1 and f[0]["severity"] == "MEDIUM" and f[0]["path"] == "k8s/d.yaml" and f[0]["fix"] == "set X"
+
+
+def test_zizmor_findings_are_parsed_with_paths_and_lines():
+    pol = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "policies", "policy.json")))
+    d = [{"ident": "unpinned-uses", "desc": "unpinned action reference", "url": "u", "determinations": {"severity": "High"},
+          "locations": [{"symbolic": {"key": {"Local": {"verbatim_path": "./.github/workflows/ci.yml"}}}, "concrete": {"location": {"start_point": {"row": 6, "column": 1}}}}]}]
+    f = gate.f_zizmor(d, pol, "/r")
+    assert f[0]["location"] == ".github/workflows/ci.yml:7" and f[0]["severity"] == "HIGH" and f[0]["tool"] == "workflow-scan"
+    assert gate.rel("./.github/x.yml", "/r") == ".github/x.yml"            # regression: lstrip("./") used to eat the leading dot of .github
+
+
 if __name__ == "__main__":
     n = fail = 0
     for name, fn in sorted(globals().items()):

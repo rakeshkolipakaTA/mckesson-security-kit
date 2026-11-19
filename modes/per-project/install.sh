@@ -36,7 +36,7 @@ mkdir -p "$S/ci"
 if [ "$VENDOR" = 1 ]; then
 rm -rf "$KIT"; mkdir -p "$KIT/scripts" "$KIT/docker"
 cp "$HERE/versions.env" "$KIT/"
-cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/secscan" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$KIT/scripts/"
+cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/secscan" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$KIT/scripts/"
 mkdir -p "$KIT/agentic" && cp -r "$HERE/agentic/agentsec" "$KIT/agentic/agentsec" && find "$KIT/agentic" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$HERE/configs" "$KIT/configs"
 cp -r "$HERE/docker/scanner" "$HERE/docker/scanner-node" "$KIT/docker/"
@@ -72,9 +72,36 @@ if want github; then
 fi
 want jenkins && { put Jenkinsfile.security Jenkinsfile.security; put securityScan.groovy securityScan.groovy; }
 want azure   && put azure-pipelines-security.yml azure-pipelines-security.yml
-want github  && put github-actions-redteam.yml security-redteam.github.yml
+want github  && { put github-actions-redteam.yml security-redteam.github.yml
+                 put github-actions-sign-release.yml security-sign-release.github.yml; put github-actions-scorecard.yml security-scorecard.github.yml; }
+put renovate.json renovate.json
 put redteam.json redteam.json.example
 put CODEOWNERS.snippet CODEOWNERS.snippet; put pre-commit-config.yaml pre-commit-config.yaml; put pull_request_template.md pull_request_template.md
+
+# 4) things outside .security/, written ONLY when absent (after that they are yours; uninstall leaves them alone)
+EXTRA=""
+find_dirs() {   # directories (as "/sub/dir", "/" for the root) holding a file that matches the given find expression
+  find "$REPO" -maxdepth 4 \( -name .git -o -name node_modules -o -name .venv -o -name venv -o -name .security -o -name target -o -name build -o -name dist -o -name site-packages \) -prune -o -type f \( "$@" \) -print 2>/dev/null \
+    | while IFS= read -r f; do d="${f%/*}"; d="${d#"$REPO"}"; echo "${d:-/}"; done | sort -u | sed -n '1,25p'
+}
+uses_github() { want github || [ -d "$REPO/.github" ] || git -C "$REPO" remote -v 2>/dev/null | grep -q 'github\.com'; }
+if uses_github && [ ! -e "$REPO/.github/dependabot.yml" ] && [ ! -e "$REPO/.github/dependabot.yaml" ]; then
+  mkdir -p "$REPO/.github"; dep="$REPO/.github/dependabot.yml"
+  { echo "# Written by secscan init (change freely: it is yours now). Opens weekly pull requests that update vulnerable / outdated dependencies."
+    echo "# cooldown = ignore versions published in the last 7 days (a freshly published malicious release is usually caught within days). Security updates ignore it."
+    echo "# Alternative: Renovate, see .security/ci/renovate.json."; echo "version: 2"; echo "updates:"
+    emit() { printf '  - package-ecosystem: "%s"\n    directory: "%s"\n    schedule:\n      interval: "weekly"\n    cooldown:\n      default-days: 7\n    open-pull-requests-limit: 5\n' "$1" "$2"; }
+    while IFS= read -r d; do [ -n "$d" ] && emit pip "$d"; done < <(find_dirs -name 'requirements*.txt' -o -name pyproject.toml -o -name Pipfile)
+    while IFS= read -r d; do [ -n "$d" ] && emit npm "$d"; done < <(find_dirs -name package.json)
+    while IFS= read -r d; do [ -n "$d" ] && emit maven "$d"; done < <(find_dirs -name pom.xml)
+    while IFS= read -r d; do [ -n "$d" ] && emit gradle "$d"; done < <(find_dirs -name 'build.gradle' -o -name 'build.gradle.kts')
+    while IFS= read -r d; do [ -n "$d" ] && emit docker "$d"; done < <(find_dirs -name 'Dockerfile*')
+    emit github-actions "/"
+  } > "$dep"
+  EXTRA="$EXTRA .github/dependabot.yml"
+fi
+if [ ! -e "$REPO/.vscode/extensions.json" ]; then mkdir -p "$REPO/.vscode"; cp "$T/vscode-extensions.json" "$REPO/.vscode/extensions.json"; EXTRA="$EXTRA .vscode/extensions.json"; fi
+if [ ! -e "$REPO/.vscode/settings.json" ]; then mkdir -p "$REPO/.vscode"; cp "$T/vscode-settings.json" "$REPO/.vscode/settings.json"; EXTRA="$EXTRA .vscode/settings.json"; fi
 
 echo
 echo "Security kit $([ $UPGRADE = 1 ] && echo upgraded || echo installed) in $S"
@@ -82,6 +109,7 @@ echo "  detected stack : $PROFILES"
 echo "  engine         : $([ "$VENDOR" = 1 ] && echo "vendored in .security/kit (works offline)" || echo "thin, pinned to secscan $VERSION_NOW in .security/secscan.lock")"
 echo "  preset         : $(grep -m1 '^SEC_PRESET=' "$S/config.env" | cut -d= -f2) (set in .security/config.env; 'starter' = report-only, scans never fail your build yet)"
 [ -n "$INSTALLED" ] && echo "  CI added       : $INSTALLED (GitHub Actions, report-only)"
+[ -n "$EXTRA" ] && echo "  also added     :$EXTRA (only when missing; they are yours now)"
 [ -z "$INSTALLED" ] && [ "$CI" != none ] && echo "  CI templates   : .security/ci/  (copy the one for your platform, see docs/ci-github-actions.md / ci-jenkins.md / ci-azure-devops.md)"
 cat <<NEXT
 
@@ -89,6 +117,6 @@ Next steps (about 10 minutes):
   1. cd "$REPO"
   2. .security/secscan doctor        # checks Docker + network, tells you exactly what to fix
   3. .security/secscan scan          # first scan; then:  .security/secscan open
-  4. git add .security $([ -n "$INSTALLED" ] && echo .github) && git commit -m "Add security scanning (report-only)"
+  4. git add .security $([ -n "$INSTALLED$EXTRA" ] && echo .github .vscode) && git commit -m "Add security scanning (report-only)"
 Later: fix findings or run '.security/secscan baseline' for legacy ones, then switch the preset: .security/secscan config set SEC_PRESET standard
 NEXT

@@ -35,6 +35,13 @@ The preset definitions live in the central policy (`configs/policies/policy.json
 | Dependency-Check | `SEC_DEPCHECK` | off (`strict`: auto) | Java project | Yes |
 | OWASP ZAP | `SEC_ZAP` | auto | `SEC_ZAP_URL` is set | Yes |
 | AI red-team probes | `SEC_REDTEAM` | auto | `SEC_REDTEAM_URL` is set | Yes |
+| Secrets in git history | `SEC_GITLEAKS_HISTORY` | auto | the folder is a git checkout | Yes |
+| SBOM (CycloneDX) | `SEC_SBOM` | auto | always | Yes |
+| GitHub Actions security (zizmor) | `SEC_WORKFLOW_SCAN` | auto | `.github/workflows` exists | Yes |
+| Kubernetes posture (kubescape) | `SEC_K8S_POSTURE` | auto | Kubernetes manifests exist | Yes |
+| GitHub repository settings | `SEC_REPO_POSTURE` | auto | GitHub repo detected and `GITHUB_TOKEN` set | Yes |
+| API fuzzing (Schemathesis) | `SEC_API_FUZZ` | auto | `SEC_API_SPEC` is set | Yes |
+| Exposure scan (TLS, headers, paths, ports) | `SEC_EXPOSURE` | auto | `SEC_EXPOSURE_TARGETS` is set | Yes |
 
 `on` for a tool that has no target (for example `SEC_ZAP=on` without `SEC_ZAP_URL`) stops the scan with a clear message instead of silently doing nothing.
 The older `SEC_SKIP=a,b` list and `--skip` still work; they mean "off" for those tools.
@@ -48,7 +55,9 @@ Reason, approver and expiry are all mandatory. After the expiry date the waiver 
 Protect `.security/` with CODEOWNERS so waivers get reviewed.
 
 ## 3. Targets
-Setting a target switches the matching tool on (in `auto`): `SEC_IMAGE` (Docker image to scan), `SEC_ZAP_URL` (a running QA app you own), `SEC_REDTEAM_URL` (a running QA agent you own). Never point ZAP or the red-team probes at production.
+Setting a target switches the matching tool on (in `auto`): `SEC_IMAGE` (Docker image to scan), `SEC_ZAP_URL` (a running QA app you own), `SEC_REDTEAM_URL` (a running QA agent you own), `SEC_API_SPEC` (OpenAPI URL to fuzz), `SEC_EXPOSURE_TARGETS` (hosts to check from outside). Never point ZAP or the red-team probes at production.
+
+Details, limits and how to read each of these: [new-checks.md](new-checks.md).
 
 ## 4. Scope
 `SEC_EXCLUDE_PATHS=vendor/**,legacy/**` leaves code and secret findings under those paths out of the result. **Dependency CVEs are never excluded** (that would hide real risk). The count of findings left out is shown in the report.

@@ -1,0 +1,59 @@
+# .security/ci/security-sign-release.github.yml - TEMPLATE, NOT RUN. Sign the container image you release and attach build provenance.
+#   * cosign "keyless" signing: no private key to store; the signature is tied to this workflow's identity (GitHub OIDC).
+#   * SLSA build provenance: a signed statement of which repo/commit/workflow built the image (actions/attest-build-provenance).
+# Copy to .github/workflows/sign-release.yml, adjust the registry/image if you do not use GitHub Packages (ghcr.io), then publish a release.
+# Verify what you deploy:
+#   cosign verify ghcr.io/<owner>/<repo>:<tag> --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#     --certificate-identity-regexp '^https://github.com/<owner>/<repo>/\.github/workflows/sign-release\.yml@'
+#   gh attestation verify oci://ghcr.io/<owner>/<repo>:<tag> --repo <owner>/<repo>
+# Actions are pinned to commit SHAs (the tag is in the comment); refresh them with Dependabot ("github-actions" ecosystem).
+name: sign-release
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-sign-attest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write        # push the image
+      id-token: write        # keyless signing + provenance (OIDC)
+      attestations: write    # store the provenance attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Image name (registry paths must be lower case)
+        env:
+          TAG: ${{ github.event.release.tag_name || github.sha }}
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532  # v4.1.3
+      - name: Sign the image by digest (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      - name: Attach SLSA build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

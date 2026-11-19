@@ -433,3 +433,37 @@ rules:
               ...
               $I += 1
               ...
+
+  - id: mckesson-agent-non-constant-time-compare
+    languages: [python]
+    severity: WARNING
+    message: >-
+      A secret, token, signature, HMAC or password is compared with == / !=. String equality stops at the first differing byte, so response
+      time leaks how much of a guess was right and lets an attacker recover the value or forge a signature. Use hmac.compare_digest(a, b)
+      (or secrets.compare_digest) on bytes/str of the same type.
+    metadata: {domain: P5, owasp: "LLM02", cwe: "CWE-208", category: security, confidence: LOW}
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: $A == $B
+                  - pattern: $A != $B
+              - metavariable-regex:
+                  metavariable: $A
+                  regex: (?i)^(self\.|request\.|req\.|headers?\.|data\.|payload\.|cfg\.|config\.)*[\w\[\]"'.]*(secret|token|signature|sig|hmac|digest|passw(or)?d|api_?key|apikey|csrf|mac|nonce)[\w\[\]"'.]*$
+          - patterns:
+              - pattern-either:
+                  - pattern: $A == $B
+                  - pattern: $A != $B
+              - metavariable-regex:
+                  metavariable: $B
+                  regex: (?i)^(self\.|request\.|req\.|headers?\.|data\.|payload\.|cfg\.|config\.)*[\w\[\]"'.]*(secret|token|signature|sig|hmac|digest|passw(or)?d|api_?key|apikey|csrf|mac|nonce)[\w\[\]"'.]*$
+      - pattern-not: $A == None
+      - pattern-not: $A != None
+      - pattern-not: $A == ""
+      - pattern-not: $A != ""
+      - pattern-not: $A == "..."
+      - pattern-not: $A != "..."
+      - pattern-not: $A == $B.$C()
+      - pattern-not: $A == True
+      - pattern-not: $A == False

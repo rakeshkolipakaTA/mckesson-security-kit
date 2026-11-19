@@ -17,6 +17,10 @@
       ],
       "block_existing": [
         "CRITICAL"
+      ],
+      "block_overdue": [
+        "CRITICAL",
+        "HIGH"
       ]
     },
     "release": {
@@ -25,6 +29,10 @@
         "HIGH"
       ],
       "block_existing": [
+        "CRITICAL",
+        "HIGH"
+      ],
+      "block_overdue": [
         "CRITICAL",
         "HIGH"
       ]
@@ -82,5 +90,29 @@
         "depcheck": "auto"
       }
     }
+  },
+  "_overdue_note": "A finding recorded in baseline.json stops being 'existing' once it is older than sla_days for its severity: if its severity is in block_overdue it blocks again. Baselines without dates (old format) are not aged until re-created with `secscan baseline`.",
+  "license_policy": {
+    "deny": [
+      "AGPL-*",
+      "SSPL-*",
+      "BUSL-*",
+      "CC-BY-NC*",
+      "Commons-Clause*"
+    ],
+    "review": [
+      "GPL-*",
+      "LGPL-*",
+      "EPL-*",
+      "MPL-*",
+      "CDDL-*",
+      "EUPL-*",
+      "OSL-*"
+    ],
+    "unknown_severity": "LOW",
+    "_note": "deny -> HIGH, review -> MEDIUM, unknown -> LOW, permissive licences are not reported. Matched case-insensitively against SPDX-style names. Legal decides the lists; this is a starting point."
+  },
+  "history_scan": {
+    "max_commits": 3000
   }
 }

@@ -7,6 +7,7 @@ Exit code: 0 = pass (or report-only), 1 = gate failed (only with --enforce), 2 =
 Stdlib only so it runs identically in central mode, the per-project kit and CI.
 """
 import argparse
+import csv
 import fnmatch
 import glob
 import datetime as dt
@@ -14,6 +15,7 @@ import hashlib
 import html as htmlmod
 import json
 import os
+import re
 import sys
 from urllib.parse import urlparse
 
@@ -23,8 +25,9 @@ SONAR_SEV = {"BLOCKER": "CRITICAL", "CRITICAL": "HIGH", "MAJOR": "MEDIUM", "MINO
 AGENT_INVENTORY = {}   # filled from agent-scan.json; shown in the reports
 REDTEAM_SUMMARY = {}
 AUDITED_LOCKS = set()  # lockfiles audited by npm-audit (Trivy's duplicate findings for them are dropped)
+SBOM_INFO = {}  # components found by the SBOM step
 DEGRADED = []  # manifests audited in pinned-only mode (dependency resolution failed)
-TOOL_CATEGORY = {"agent-scan": "Agentic governance", "redteam": "AI red team", "modelscan": "Model files (P6)", "semgrep": "SAST", "eslint": "SAST", "npm-audit": "SCA", "bandit": "SAST", "sonarqube": "SAST", "pip-audit": "SCA", "dependency-check": "SCA",
+TOOL_CATEGORY = {"gitleaks-history": "Secrets (git history)", "sbom": "SBOM", "workflow-scan": "CI/CD security", "api-fuzz": "API fuzzing", "exposure": "Exposure / TLS", "repo-posture": "Repo posture", "k8s-posture": "Kubernetes posture", "agent-scan": "Agentic governance", "redteam": "AI red team", "modelscan": "Model files (P6)", "semgrep": "SAST", "eslint": "SAST", "npm-audit": "SCA", "bandit": "SAST", "sonarqube": "SAST", "pip-audit": "SCA", "dependency-check": "SCA",
                  "zap": "DAST", "trivy-fs": "SCA/Container/IaC", "trivy-image": "Container", "gitleaks": "Secrets"}
 
 
@@ -43,7 +46,7 @@ def rel(path, root):
     for prefix in (root.rstrip("/") + "/", "/src/"):
         if prefix and path.startswith(prefix):
             return path[len(prefix):]
-    return path.lstrip("./") if path.startswith("./") else path
+    return path[2:] if path.startswith("./") else path
 
 
 def fp(*parts):
@@ -200,6 +203,18 @@ def f_pipaudit(d, policy, root, manifest=""):
     return out
 
 
+def license_sev(name, policy):
+    """Central licence policy: deny -> HIGH, review -> MEDIUM, unknown -> LOW, permissive -> not reported (None)."""
+    lp = policy.get("license_policy") or {}
+    n = (name or "").strip()
+    if not n or n.upper() in ("UNKNOWN", "NOASSERTION"):
+        return lp.get("unknown_severity", "LOW")
+    for sev, key in (("HIGH", "deny"), ("MEDIUM", "review")):
+        if any(fnmatch.fnmatch(n.lower(), pat.lower()) for pat in lp.get(key, [])):
+            return sev
+    return None
+
+
 def f_trivy(d, policy, root, tool):
     out = []
     for res in d.get("Results", []) or []:
@@ -215,6 +230,15 @@ def f_trivy(d, policy, root, tool):
             out.append(dict(tool=tool, category="Secrets", severity=norm_sev(s.get("Severity"), policy),
                             dkey=("secret", target, s.get("StartLine")), rule=s["RuleID"], title=s.get("Title", "secret"), location=f"{target}:{s.get('StartLine')}",
                             path=target, fingerprint=fp(tool, s["RuleID"], target, s.get("StartLine")), fix=None))
+        for lic in res.get("Licenses") or []:
+            sev = license_sev(lic.get("Name"), policy)
+            if sev is None:
+                continue
+            pkg = lic.get("PkgName") or lic.get("FilePath") or ""
+            out.append(dict(tool=tool, category="License", severity=sev, rule=f"license:{lic.get('Name') or 'unknown'}",
+                            title=f"{pkg}: licence {lic.get('Name') or 'unknown'} needs {'removal' if sev == 'HIGH' else 'a legal review' if sev == 'MEDIUM' else 'identification'}",
+                            location=f"{target}: {pkg}", path=target, fingerprint=fp(tool, "license", lic.get("Name"), pkg, target),
+                            fix="Replace the dependency, or get the licence approved by legal"))
         for m in res.get("Misconfigurations") or []:
             if m.get("Status") != "FAIL":
                 continue
@@ -233,6 +257,96 @@ def f_gitleaks(d, policy, root):
                         path=path, fingerprint=fp("gitleaks", r["RuleID"], path, r.get("Secret", "")[:4], r.get("StartLine")),
                         fix=None))
     return out
+
+
+def f_cis(d, tool, policy):
+    """Trivy compliance summary (CIS Docker benchmark): one advisory finding per failed control, capped at MEDIUM (Trivy's own DS-* checks stay authoritative)."""
+    out = []
+    for c in d.get("SummaryControls") or []:
+        if not c.get("TotalFail"):
+            continue
+        sev = "MEDIUM" if str(c.get("Severity", "")).upper() in ("CRITICAL", "HIGH", "MEDIUM") else "LOW"
+        out.append(dict(tool=tool, category="Container", severity=sev, rule=f"CIS-DOCKER-{c.get('ID')}", title=f"CIS Docker benchmark {c.get('ID')}: {c.get('Name')}",
+                        location=f"image (control {c.get('ID')})", path="image", fingerprint=fp(tool, "cis", c.get("ID")), fix="See the CIS Docker Benchmark remediation for this control"))
+    return out
+
+
+def f_gitleaks_history(d, policy, root):
+    """Secrets found in past commits, grouped per (rule, file): one finding says how many commits, since when."""
+    groups = {}
+    for r in d or []:
+        groups.setdefault((r["RuleID"], rel(r.get("File"), root)), []).append(r)
+    out = []
+    for (rule, path), rs in groups.items():
+        rs.sort(key=lambda r: r.get("Date") or "")
+        first = rs[0]
+        when = (first.get("Date") or "")[:10]
+        out.append(dict(tool="gitleaks-history", category="Secrets", severity=norm_sev(policy["secret_severity"], policy), rule=rule,
+                        title=f"{first.get('Description', 'secret')} in git history: {len(rs)} commit(s), first {(first.get('Commit') or '')[:8]} on {when}. Rotate it: deleting the file does not remove it from history",
+                        location=f"{path} (history)", path=path, age_hint=when,
+                        fingerprint=fp("gitleaks-history", rule, path), fix="Revoke/rotate the credential; then remove it from history only if policy requires it"))
+    return out
+
+
+ZIZMOR_SEV = {"HIGH": "HIGH", "MEDIUM": "MEDIUM", "LOW": "LOW", "INFORMATIONAL": "INFO", "UNKNOWN": "MEDIUM"}
+
+
+def f_zizmor(d, policy, root):
+    out = []
+    for x in d:
+        det = x.get("determinations") or {}
+        sev = ZIZMOR_SEV.get(str(det.get("severity", "")).upper(), policy["unknown_severity_as"])
+        for loc in (x.get("locations") or [{}])[:1]:
+            key = ((loc.get("symbolic") or {}).get("key") or {}).get("Local") or {}
+            path = rel(key.get("verbatim_path") or key.get("given_path") or key.get("prefix") or "", root)
+            row = (((loc.get("concrete") or {}).get("location") or {}).get("start_point") or {}).get("row")
+            line = (row + 1) if isinstance(row, int) else ""
+            out.append(dict(tool="workflow-scan", category="CI/CD", severity=sev, rule=x.get("ident", "zizmor"),
+                            title=(x.get("desc") or "")[:200], location=f"{path}:{line}" if line else path, path=path,
+                            fingerprint=fp("workflow-scan", x.get("ident"), path, line), fix=x.get("url")))
+    return out
+
+
+KUBESCAPE_SEV = {"CRITICAL": "HIGH", "HIGH": "MEDIUM", "MEDIUM": "LOW", "LOW": "LOW"}  # advisory: one level below Trivy's authoritative checks
+
+
+def f_kubescape(d, policy, root):
+    src = {}
+    for r in d.get("resources", []):
+        s = r.get("source") or {}
+        src[r["resourceID"]] = rel(os.path.join(s.get("path", ""), s.get("relativePath", "")), root)
+    ctl = d.get("summaryDetails", {}).get("controls", {})
+    out = []
+    for res in d.get("results", []):
+        rid = res["resourceID"]
+        name = rid.rsplit("/", 2)[-2:] if "/" in rid else [rid]
+        for c in res.get("controls", []):
+            if (c.get("status") or {}).get("status") != "failed":
+                continue
+            path = src.get(rid, "")
+            sev = KUBESCAPE_SEV.get(str(c.get("severity", "")).upper(), "LOW")
+            out.append(dict(tool="k8s-posture", category="Kubernetes", severity=sev, rule=c["controlID"],
+                            title=f"{c.get('name', '')} ({'/'.join(name)})", location=f"{path}: {'/'.join(name)}", path=path,
+                            fingerprint=fp("k8s-posture", c["controlID"], rid), fix=(ctl.get(c["controlID"], {}) or {}).get("remediation") or "see https://hub.armosec.io/docs/" + c["controlID"].lower()))
+    return out
+
+
+def f_simple(d, tool, category, policy):
+    """Tools of ours that write {"findings": [{severity, rule, title, location, fix}]} (exposure, repo-posture, ...)."""
+    out = []
+    for x in d.get("findings", []):
+        out.append(dict(tool=tool, category=category, severity=norm_sev(x.get("severity"), policy), rule=x.get("rule", tool), title=str(x.get("title", ""))[:300],
+                        location=str(x.get("location", "")), path=str(x.get("path") or x.get("location", "")).split(" ")[0],
+                        fingerprint=fp(tool, x.get("rule"), x.get("location")), fix=x.get("fix")))
+    return out
+
+
+def f_sbom(d):
+    comps = d.get("components") or []
+    SBOM_INFO.clear()
+    SBOM_INFO.update(components=len(comps), by_type={t: sum(1 for c in comps if c.get("type") == t) for t in sorted({c.get("type") for c in comps if c.get("type")})},
+                     with_license=sum(1 for c in comps if c.get("licenses")), format=d.get("bomFormat", "CycloneDX"), spec=d.get("specVersion", ""))
+    return []
 
 
 def f_depcheck(d, policy, root):
@@ -291,10 +405,18 @@ def collect(raw_dir, tools, policy, root):
         "agent-scan": lambda d: f_agentscan(d, policy, root) if isinstance(d, dict) and "findings" in d else None,
         "redteam": lambda d: f_redteam(d, policy, root) if isinstance(d, dict) and "results" in d else None,
         "modelscan": lambda d: f_modelscan(d, policy, root) if isinstance(d, dict) and "issues" in d else None,
+        "gitleaks-history": lambda d: f_gitleaks_history(d, policy, root) if isinstance(d, list) else None,
+        "sbom": lambda d: f_sbom(d) if isinstance(d, dict) and "components" in d else None,
+        "exposure": lambda d: f_simple(d, "exposure", "Exposure", policy) if isinstance(d, dict) and "findings" in d else None,
+        "repo-posture": lambda d: f_simple(d, "repo-posture", "Repo posture", policy) if isinstance(d, dict) and "findings" in d else None,
+        "workflow-scan": lambda d: f_zizmor(d, policy, root) if isinstance(d, list) else None,
+        "api-fuzz": lambda d: f_simple(d, "api-fuzz", "API fuzzing", policy) if isinstance(d, dict) and "findings" in d else None,
+        "k8s-posture": lambda d: f_kubescape(d, policy, root) if isinstance(d, dict) and "results" in d and "summaryDetails" in d else None,
     }
     findings, status = [], {}
     DEGRADED.clear()
     AUDITED_LOCKS.clear()
+    SBOM_INFO.clear()
     for t in tools:
         if t == "pip-audit":  # one report per manifest, see raw/pip-audit.manifests
             files = sorted(glob.glob(os.path.join(raw_dir, "pip-audit-*.json"))) or sorted(glob.glob(os.path.join(raw_dir, "pip-audit.json")))
@@ -356,6 +478,17 @@ def collect(raw_dir, tools, policy, root):
             else:
                 status[t] = "ok"
                 findings += res
+    if "trivy-image" in tools:
+        cis = load(os.path.join(raw_dir, "trivy-image-cis.json"))
+        if isinstance(cis, dict) and "SummaryControls" in cis:
+            findings += f_cis(cis, "trivy-image", policy)
+    if "gitleaks-history" in tools:
+        note = os.path.join(raw_dir, "gitleaks-history.note")
+        if os.path.exists(note):
+            DEGRADED.append(open(note).read().strip())
+        # a secret that is still in the working tree is already reported by gitleaks: keep only history-only (deleted) ones
+        live = {(f["rule"], f["path"]) for f in findings if f["tool"] == "gitleaks"}
+        findings = [f for f in findings if not (f["tool"] == "gitleaks-history" and (f["rule"], f["path"]) in live)]
     if AUDITED_LOCKS:
         findings = [f for f in findings if not (f["tool"] == "trivy-fs" and f["category"] == "SCA" and f["path"] in AUDITED_LOCKS)]
     return findings, status
@@ -448,17 +581,65 @@ def apply_exclusions(findings, patterns):
     return kept, len(findings) - len(kept)
 
 
-def evaluate(findings, gate, baseline):
+def load_baseline(path):
+    """{fingerprint: 'YYYY-MM-DD' | None}. The old format (a plain list) has no dates, so its findings never age."""
+    if not path or not os.path.exists(path):
+        return None
+    raw = json.load(open(path))
+    return {k: v for k, v in raw.items()} if isinstance(raw, dict) else {k: None for k in raw}
+
+
+def evaluate(findings, gate, baseline, sla_days=None):
+    """Blocking findings. New findings block per gate.block_new; baselined ones per block_existing, or - once older than the SLA for
+    their severity - per block_overdue (the baseline stops being a free pass: that is how the SLA is enforced)."""
     blocking = []
+    today = dt.date.today()
+    sla_days = sla_days or {}
+    if baseline is not None and not isinstance(baseline, dict):
+        baseline = {k: None for k in baseline}
     for f in findings:
         if f.get("excepted"):
             continue
         is_new = baseline is None or not any(x in baseline for x in f["fps"])
         f["new"] = is_new
         sevs = gate["block_new"] if is_new else gate["block_existing"]
+        if not is_new:
+            dates = [baseline[x] for x in f["fps"] if baseline.get(x)]
+            if dates:
+                f["age_days"] = (today - dt.date.fromisoformat(min(dates))).days
+                limit = sla_days.get(f["severity"])
+                if limit is not None and f["age_days"] > limit:
+                    f["overdue"] = True
+                    if f["severity"] in gate.get("block_overdue", []):
+                        sevs = list(sevs) + [f["severity"]]
         if f["severity"] in sevs:
             blocking.append(f)
     return blocking
+
+
+def assign_controls(findings, cw):
+    """Crosswalk: tag every finding with the architectural controls it evidences (configs/compliance/crosswalk.json)."""
+    rules = [(fld, re.compile(rx), ctrls) for fld, rx, ctrls in (cw or {}).get("rules", [])]
+    for f in findings:
+        hit = set()
+        for fld, rx, ctrls in rules:
+            if rx.search(str(f.get(fld, ""))):
+                hit.update(ctrls)
+        f["controls"] = sorted(hit)
+    return findings
+
+
+def crosswalk_summary(findings, cw):
+    out = {}
+    for f in findings:
+        if f.get("excepted"):
+            continue
+        for c in f.get("controls", []):
+            d = out.setdefault(c, {s: 0 for s in SEV})
+            d[f["severity"]] += 1
+    ctrl = (cw or {}).get("controls", {})
+    return [dict(control=c, name=ctrl.get(c, {}).get("name", c), standards={k: v for k, v in ctrl.get(c, {}).items() if k not in ("name", "pillar")}, counts=n, total=sum(n.values()))
+            for c, n in sorted(out.items())]
 
 
 def counts(findings):
@@ -509,6 +690,18 @@ def write_md(path, summary, findings, blocking):
             L += [f"- {summary['excluded_by_path']} code finding(s) left out by SEC_EXCLUDE_PATHS ({', '.join(summary.get('exclude_paths', []))})"]
     if summary.get("sonar_quality_gate_failures"):
         L += ["", "## SonarQube quality gate", ""] + [f"- {q}" for q in summary["sonar_quality_gate_failures"]]
+    if summary.get("overdue"):
+        L += ["", "## Past their remediation deadline", "", f"{summary['overdue']} baselined finding(s) are older than the SLA for their severity ("
+              + ", ".join(f"{k}: {v}" for k, v in summary["overdue_by_severity"].items()) + "). Baselined Critical/High findings block again once overdue; fix them or record a time-boxed exception."]
+    if summary.get("sbom"):
+        sb = summary["sbom"]
+        L += ["", "## Software bill of materials", "", f"{sb.get('components', 0)} components ({sb.get('format')} {sb.get('spec')}), {sb.get('with_license', 0)} with licence data. File: `sbom.cdx.json` (CycloneDX)."]
+    if summary.get("crosswalk"):
+        L += ["", "## Compliance view (which control each finding evidences)", "", "| Control | Findings | Critical | High | NIST AI RMF | OWASP LLM | EU AI Act |", "|---|---|---|---|---|---|---|"]
+        for x in summary["crosswalk"]:
+            st = x["standards"]
+            L.append(f"| {x['control']} {x['name']} | {x['total']} | {x['counts']['CRITICAL']} | {x['counts']['HIGH']} | {st.get('NIST AI RMF', '')} | {st.get('OWASP LLM Top 10', '')} | {st.get('EU AI Act', '')} |")
+        L.append("\nFull per-finding mapping: `crosswalk.csv`. Heuristic mapping, not a compliance verdict.")
     if summary["expired_exceptions"]:
         L += ["", "## Expired exceptions (no longer applied)", ""] + [f"- {e.get('rule') or e.get('fingerprint')}: {e['reason']} (expired {e['expires']})" for e in summary["expired_exceptions"]]
     open(path, "w").write("\n".join(L) + "\n")
@@ -614,6 +807,7 @@ def main():
     ap.add_argument("--exceptions", help="exceptions.json")
     ap.add_argument("--root", default="/src", help="path prefix to strip from reported file paths")
     ap.add_argument("--target", default="repo")
+    ap.add_argument("--crosswalk", help="crosswalk.json (control -> standards, finding -> control rules)")
     ap.add_argument("--plan", help="plan.json written by toolplan.py (which tools ran / were skipped and why)")
     ap.add_argument("--exclude", default="", help="comma list of path globs (SEC_EXCLUDE_PATHS)")
     a = ap.parse_args()
@@ -627,9 +821,11 @@ def main():
     plan = plan if isinstance(plan, dict) else {}
 
     if a.write_baseline:
-        fps = sorted({x for f in findings for x in f["fps"]})
-        json.dump(fps, open(a.write_baseline, "w"), indent=1)
-        print(f"baseline written: {len(fps)} findings -> {a.write_baseline}")
+        old = load_baseline(a.write_baseline) or load_baseline(a.baseline) or {}
+        today = dt.date.today().isoformat()
+        fps = {x: old.get(x) or today for f in findings for x in f["fps"]}  # a finding keeps the date it was first recorded
+        json.dump(dict(sorted(fps.items())), open(a.write_baseline, "w"), indent=1)
+        print(f"baseline written: {len(fps)} fingerprints (dated; findings older than their SLA block again) -> {a.write_baseline}")
         return 0
 
     qg = load(os.path.join(a.out, "raw", "sonarqube-qualitygate.json"))
@@ -637,8 +833,13 @@ def main():
     if isinstance(qg, dict) and qg.get("projectStatus", {}).get("status") == "ERROR":
         qg_fail = [f"SonarQube quality gate: {c['metricKey']} {c.get('actualValue')} vs {c.get('comparator')} {c.get('errorThreshold')}"
                    for c in qg["projectStatus"].get("conditions", []) if c.get("status") == "ERROR"] or ["SonarQube quality gate: ERROR"]
-    baseline = set(json.load(open(a.baseline))) if a.baseline and os.path.exists(a.baseline) else None
-    blocking = evaluate(findings, policy["gates"][a.gate], baseline)
+    baseline = load_baseline(a.baseline)
+    blocking = evaluate(findings, policy["gates"][a.gate], baseline, policy.get("sla_days"))
+    cw = load(a.crosswalk) if a.crosswalk else None
+    cw = cw if isinstance(cw, dict) else {}
+    assign_controls(findings, cw)
+    xwalk = crosswalk_summary(findings, cw)
+    overdue = [f for f in findings if f.get("overdue") and not f.get("excepted")]
     bad_tools = {t: s for t, s in status.items() if s != "ok"}
     failed = bool(blocking) or bool(qg_fail) or (a.enforce and bool(bad_tools))  # fail closed: a broken scanner must not look like a pass
     result = "FAIL" if failed else "PASS"
@@ -654,12 +855,18 @@ def main():
                    counts=counts(findings), new_counts=counts(new), by_tool=by_tool, tool_status=status,
                    baseline_used=baseline is not None, exceptions_applied=sum(1 for f in findings if f.get("excepted")),
                    expired_exceptions=expired, sonar_quality_gate_failures=qg_fail, degraded_manifests=list(DEGRADED),
-                   agent_inventory=dict(AGENT_INVENTORY), redteam=dict(REDTEAM_SUMMARY),
+                   agent_inventory=dict(AGENT_INVENTORY), redteam=dict(REDTEAM_SUMMARY), sbom=dict(SBOM_INFO), crosswalk=xwalk,
+                   overdue=len(overdue), overdue_by_severity={s: sum(1 for f in overdue if f["severity"] == s) for s in SEV if any(f["severity"] == s for f in overdue)},
                    preset=plan.get("preset"), excluded_by_path=excluded, exclude_paths=[p for p in a.exclude.split(",") if p],
                    tools_not_run={t: v["reason"] for t, v in plan.get("tools", {}).items() if not v["run"] and v["mode"] == "off" and v.get("explicit")},
                    tools_forced=[t for t, v in plan.get("tools", {}).items() if v.get("forced")], tool_waivers=plan.get("waivers", []))
     json.dump(findings, open(os.path.join(a.out, "findings.json"), "w"), indent=1)
     json.dump(summary, open(os.path.join(a.out, "summary.json"), "w"), indent=1)
+    with open(os.path.join(a.out, "crosswalk.csv"), "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["severity", "tool", "rule", "location", "controls", "age_days", "overdue"])
+        for f in findings:
+            w.writerow([f["severity"], f["tool"], f["rule"], f["location"], " ".join(f.get("controls", [])), f.get("age_days", ""), "yes" if f.get("overdue") else ""])
     write_md(os.path.join(a.out, "summary.md"), summary, findings, blocking)
     write_html(os.path.join(a.out, "summary.html"), summary, findings, blocking)
     write_sarif(os.path.join(a.out, "results.sarif"), findings)

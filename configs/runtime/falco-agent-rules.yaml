@@ -1,0 +1,104 @@
+# Falco rules for AI-agent workloads on Kubernetes.  TEMPLATE, NOT RUN IN PRODUCTION.
+# Falco is a runtime detector (eBPF/kernel); these rules need a node with the Falco driver. They were only checked with
+# `falco --validate` (syntax and field names), never against a live agent. Tune the lists below to your cluster, run in
+# "notice only" mode for a few weeks, then route WARNING and above to your SIEM (docs/runtime-detection.md).
+#
+# Load AFTER the stock rules (falco_rules.yaml), because these use its macros: spawned_process, open_read, open_write, outbound.
+# What it watches (presentation items: undetected agent compromise, container breakout, SSRF to metadata, credential harvesting):
+#   shell / package manager / network tool started inside an agent container, service-account token or mounted secret read by
+#   an unexpected process, connection to the cloud metadata service, writes into executable directories, tampering with the audit log.
+- required_engine_version: 0.35.0
+
+# ---- EDIT these for your cluster ------------------------------------------------------------------
+- list: agent_namespaces
+  items: [agents, ai-agents]
+
+- list: agent_secret_readers          # processes that legitimately read the service-account token / secrets
+  items: [python, python3, node, java, uvicorn, gunicorn]
+
+- list: agent_audit_writers           # the only processes allowed to write the agent audit log
+  items: [python, python3, node, java, uvicorn, gunicorn]
+
+- list: agent_audit_dirs
+  items: [/var/log/agent-audit, /var/log/agentsec]
+# ----------------------------------------------------------------------------------------------------
+
+- list: agent_shells
+  items: [sh, bash, dash, ash, zsh, ksh, csh, tcsh]
+
+- list: agent_pkg_managers
+  items: [pip, pip3, npm, yarn, pnpm, apt, apt-get, apk, yum, dnf, gem, go]
+
+- list: agent_net_tools
+  items: [nc, ncat, netcat, socat, nmap, curl, wget]
+
+- list: agent_exec_dirs
+  items: [/bin, /sbin, /usr/bin, /usr/sbin, /usr/local/bin, /usr/local/sbin]
+
+- macro: agent_container
+  condition: (container.id != host and k8s.ns.name in (agent_namespaces))
+
+- rule: Agent container started a shell
+  desc: A shell inside an agent container is how a prompt-injected "run this command" tool or a breakout attempt usually shows up.
+  condition: spawned_process and agent_container and proc.name in (agent_shells)
+  output: >
+    Shell started in an agent container (user=%user.name shell=%proc.name parent=%proc.pname cmdline=%proc.cmdline
+    container=%container.name image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: WARNING
+  tags: [agent, container, mitre_execution]
+
+- rule: Agent container ran a package manager
+  desc: Agents should not install software at runtime (supply-chain compromise, tool-created code). Images must be immutable.
+  condition: spawned_process and agent_container and proc.name in (agent_pkg_managers)
+  output: >
+    Package manager run in an agent container (user=%user.name cmd=%proc.cmdline container=%container.name
+    image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: WARNING
+  tags: [agent, supply_chain, mitre_execution]
+
+- rule: Agent container started a network tool
+  desc: curl / nc / socat / nmap in an agent container bypasses the application's egress allow-list (SSRF, data exfiltration, reverse shell).
+  condition: spawned_process and agent_container and proc.name in (agent_net_tools)
+  output: >
+    Network tool started in an agent container (tool=%proc.name cmdline=%proc.cmdline user=%user.name container=%container.name
+    image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: WARNING
+  tags: [agent, network, mitre_command_and_control]
+
+- rule: Agent read a service-account token or mounted secret
+  desc: A process other than the agent runtime read credentials (credential harvesting after a compromise).
+  condition: >
+    open_read and agent_container and not proc.name in (agent_secret_readers)
+    and (fd.name startswith /var/run/secrets/kubernetes.io/serviceaccount or fd.name startswith /run/secrets)
+  output: >
+    Credential file read by an unexpected process (file=%fd.name proc=%proc.name cmdline=%proc.cmdline container=%container.name
+    image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: ERROR
+  tags: [agent, secrets, mitre_credential_access]
+
+- rule: Agent contacted the cloud metadata service
+  desc: Connection to 169.254.169.254 from an agent container is the classic SSRF target (instance credentials).
+  condition: outbound and agent_container and fd.sip = "169.254.169.254"
+  output: >
+    Agent container connected to the cloud metadata service (connection=%fd.name proc=%proc.name cmdline=%proc.cmdline
+    container=%container.name image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [agent, ssrf, mitre_credential_access]
+
+- rule: Agent wrote into an executable directory
+  desc: An agent (or the code it was tricked into running) dropped or replaced a binary.
+  condition: open_write and agent_container and fd.directory in (agent_exec_dirs)
+  output: >
+    Write into an executable directory in an agent container (file=%fd.name proc=%proc.name cmdline=%proc.cmdline
+    container=%container.name image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: ERROR
+  tags: [agent, filesystem, mitre_persistence]
+
+- rule: Agent audit log modified by an unexpected process
+  desc: The agent audit log is hash-chained (agentsec.AuditLog); only the agent runtime may append to it. Anything else is tampering.
+  condition: open_write and agent_container and fd.directory in (agent_audit_dirs) and not proc.name in (agent_audit_writers)
+  output: >
+    Audit log written by an unexpected process (file=%fd.name proc=%proc.name cmdline=%proc.cmdline container=%container.name
+    image=%container.image.repository ns=%k8s.ns.name pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [agent, audit, mitre_defense_evasion]

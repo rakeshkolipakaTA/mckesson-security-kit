@@ -6,59 +6,48 @@ Generated from `tools/coverage_data.py` on 2026-11-19. The same data is in [secu
 
 | Category | Question it answers | Checks | Tools |
 |---|---|---|---|
-| Secrets | Is a password, token or key sitting in the code? | 5 | gitleaks, Trivy, Semgrep, agent-scan |
+| Secrets | Is a password, token or key sitting in the code? | 6 | gitleaks (tree + git history), Trivy, Semgrep, agent-scan |
 | Code analysis (SAST) | Does our own code contain insecure patterns? | 4 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
-| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 4 | pip-audit, npm audit, Trivy, Dependency-Check (optional) |
-| Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 3 | Trivy (Dockerfile, Kubernetes/Helm, image) |
-| Dynamic testing (DAST) | Can a running app be attacked from outside? | 3 | OWASP ZAP (baseline, API, full) |
-| AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 27 | 16 Semgrep agent rules, 12 agent-scan checks, modelscan |
-| AI agent: red-team probes | Does a running agent resist real attack attempts? | 20 | 18 deterministic probes; DeepTeam and promptfoo templates |
-| AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 9 | agentsec (9 modules) |
-| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 8 | gate.py, dashboard, reports |
-| Developer workflow | Catches problems on the developer's machine before CI. | 2 | pre-push hook, pre-commit, PR template |
-| **Total** |  | **85** | 14 scanner tools plus the library and gate |
+| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 6 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
+| Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 8 | Trivy (Dockerfile, Kubernetes/Helm, Terraform/CloudFormation, image, CIS), kubescape; cluster/cloud docs + template |
+| Dynamic testing (DAST) | Can a running app be attacked from outside? | 6 | OWASP ZAP (baseline, API, full, authenticated), Schemathesis, exposure scan |
+| Supply chain & CI/CD | Can our pipeline or our dependencies be tampered with? | 5 | zizmor, repo-settings check, Dependabot/Renovate, signing + Scorecard templates |
+| AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 29 | 17 Semgrep agent rules, 13 agent-scan checks, modelscan |
+| AI agent: red-team probes | Does a running agent resist real attack attempts? | 21 | 19 deterministic probes; DeepTeam (7 frameworks) and promptfoo templates |
+| AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 16 | agentsec (16 modules) |
+| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 12 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
+| Developer workflow | Catches problems on the developer's machine before CI. | 3 | pre-push hook, pre-commit, PR template, IDE recommendations |
+| Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
+| Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
+| **Total** |  | **119** | 21 scanner tools plus the library, gate and process kit |
 
-A *check* is one rule, probe or control we can name. Scanner tools such as Semgrep contain thousands of rules; they are counted once. The first seven categories are tests that find problems; the last three are controls, decision logic and workflow.
+A *check* is one rule, probe or control we can name. Scanner tools such as Semgrep contain thousands of rules; they are counted once. Categories 1-8 find problems (scanners, probes, template/doc checks); the rest are controls you embed, decision logic and process.
 
 ## 2. Status of every check
 
 | Status | Meaning | Count |
 |---|---|---|
-| Verified | run end to end in this repo or on a real app | 69 |
-| Verified (partial) | run, with a stated limit | 3 |
+| Verified | run end to end in this repo or on a real app | 88 |
+| Verified (partial) | run, with a stated limit | 6 |
 | Wired, not run | wired up but never run (needs a key) | 1 |
-| Template | shipped template, not run with a real LLM | 2 |
-| Reference library | working code with unit tests that you must wire into your platform | 9 |
-| Not enforced | described in policy but not enforced | 1 |
+| Template | shipped template, not run with a real LLM | 7 |
+| Reference library | working code with unit tests that you must wire into your platform | 14 |
+| Not enforced | described in policy but not enforced | 0 |
+| Documented | procedure or recipe, not code | 3 |
 
 ## 3. Coverage of the Agentic Security presentation
 
-97 items checked (pillars, threats, controls, red-team frameworks, pipeline and tool slides, auth engine): **33 covered (34%), 44 partial (45%), 20 not covered (21%)**.
+97 items checked (pillars, threats, controls, red-team frameworks, pipeline and tool slides, auth engine): **47 covered (48%), 47 partial (48%), 3 not covered (3%)**.
 
 **Short answer: no, not everything in the presentation is covered.** Scanning, pipeline gates, red-team probes and the runtime-controls library are covered. Platform services (sandbox runtime, identity provider / vault, policy admin UI, runtime detection) and several data and output-integrity items are not, because they are not things a scanner can provide.
 
+**What the words mean.** *Covered*: we ship working, tested code or a check for it (platform wiring, such as routing your agent through the sandbox, stays with the team). *Partial*: part of it is covered, or it is a template / recipe that has not run in a live environment. *Not covered*: nothing provided.
+
 Not covered:
 
-- **2. Tool isolation & sandboxing** (Key pillars): No sandbox runtime: use gVisor / Firecracker / ephemeral containers
-- **Erroneous analytical output (hallucination)** (Threat catalog P3): No output validation / lineage checks
-- **Unencrypted agent state & memory at rest** (Threat catalog P5): Not checked
-- **Undetected agent compromise** (Threat catalog P8): No runtime detection, baseline or alerting
-- **P2 Hardened Execution Sandbox** (Architectural controls): No sandbox runtime
-- **P3 Output Integrity & Lineage** (Architectural controls): No validation of reported figures
-- **NIST AI RMF / NIST CSF 2.0 / ISO 42001 / EU AI Act / BFS themes mapping** (Governance crosswalk): The presentation has the mapping; a per-finding crosswalk is not built
-- **BeaverTails** (Red-team frameworks): Not wired
-- **Aegis** (Red-team frameworks): Not wired
 - **OWASP Agents: rogue agents** (Red-team frameworks): not provided
 - **OWASP Agents: inter-agent communication** (Red-team frameworks): not provided
-- **Automated PR remediation (Snyk-style fix PRs)** (DevSecOps pipeline): Add Dependabot or Renovate
-- **IDE extension scanners** (DevSecOps pipeline): Not provided
-- **eBPF runtime observability** (DevSecOps pipeline): Not provided (Falco / Tetragon)
-- **Dynamic secret rotation** (DevSecOps pipeline): Not provided
-- **Private cluster ingress** (DevSecOps pipeline): Infrastructure setting, not a scan
-- **PIP: policy information point** (Auth engine (PDP/PEP)): not provided
-- **PAP: policy administration point (UI / API)** (Auth engine (PDP/PEP)): Policies are code / config
 - **Platform services (policy engines, secure vault, resource registry, external RBAC, API gateway)** (Auth engine (PDP/PEP)): Platform components, not scanning
-- **Agent sandbox execution (linked design doc)** (Auth engine (PDP/PEP)): Not provided
 
 The full item-by-item table is in the Excel sheet *Presentation coverage*.
 
@@ -77,43 +66,62 @@ Cyber security is protecting systems, networks, applications and data from unaut
 | Governance, risk and compliance | Policies, SLAs, audits, mapping to standards. | Gate, exceptions and dashboard; SLA and crosswalk missing |
 | People and process | Training, reviews, threat modelling, penetration tests. | Not a tool: needs to be run by the team |
 
-Our scans are **application and delivery-pipeline security** (the first rows). That is one slice of cyber security: network, endpoint, cloud, detection and response, and people and process need other tools and activities.
+Our scans are **application and delivery-pipeline security** (the first rows), plus runtime controls for AI agents and starter kits for detection and process. That is one slice of cyber security: network, endpoint, cloud operations and people still need their own tools and activities.
 
-## 5. Other checks worth adding (priority order)
+## 5. Roadmap: what was added and what is still open
 
-| Priority | Area | Missing check | Why | Suggested tool | Effort |
-|---|---|---|---|---|---|
-| High | Secrets | Scan git history, not just the current files | A secret deleted in a later commit is still in the history and still valid | gitleaks git mode | Small |
-| High | Supply chain | SBOM generation + licence compliance | Know exactly what ships; block disallowed licences; answer 'are we affected by CVE-X?' in minutes | Trivy / Syft (CycloneDX, SPDX) | Small |
-| High | Supply chain | Automated dependency-update pull requests | Turns the report into fixes (presentation: Snyk-style remediation) | Dependabot or Renovate | Small |
-| High | Process | Enforce remediation SLAs and create tickets | Findings only get fixed when they have an owner and a deadline; policy lists SLAs but nothing enforces them | Dashboard age tracking + Jira / Azure Boards / GitHub issues | Medium |
-| High | DAST | Authenticated and body-aware API testing | Most real bugs sit behind login; current ZAP runs are unauthenticated | ZAP automation plans, Schemathesis (from OpenAPI) | Medium |
-| Medium | Supply chain | Image signing, build provenance, pinned CI actions | Proves the image you deploy is the one you built; stops tampered CI steps | cosign, SLSA provenance, zizmor / pinact, OpenSSF Scorecard | Medium |
-| Medium | Kubernetes | Cluster posture and CIS benchmarks | Manifests are scanned, but the live cluster (RBAC, network policy) is not | Kubescape, kube-bench, Trivy compliance profiles | Medium |
-| Medium | Cloud / IaC | Terraform / CloudFormation and cloud-posture checks | Public buckets, open security groups, unnecessary load balancers (presentation item) | Trivy config / Checkov, Prowler | Medium |
-| Medium | Exposure | External attack-surface and TLS checks | Finds public OTEL / debug endpoints and weak TLS from the outside | nuclei, nmap, testssl.sh | Medium |
-| Medium | Runtime | Runtime threat detection and alerting | Spots a compromised agent or container in production (presentation: eBPF, SIEM) | Falco / Tetragon, Sentinel / Datadog integration | Large |
-| Medium | AI | Real-LLM red teaming + content-safety datasets | The mock-LLM tests prove app controls, not model robustness | DeepTeam / promptfoo with an approved model; BeaverTails, Aegis | Medium |
-| Medium | AI | Output integrity / hallucination validation | Plausible wrong numbers reaching a business decision (OWASP LLM09) | Schema + source-lineage checks, evaluation sets | Large |
-| Medium | AI | Agent code-execution sandbox | Contains an agent that is tricked into running code | gVisor, Firecracker, ephemeral containers | Large |
-| Medium | Data | Data classification, stronger PII detection, retention and residency checks | Regex masking misses names and addresses; no retention or region enforcement | Microsoft Presidio, DLP tooling | Large |
-| Medium | Secrets | Vault integration and rotation checks | Static unrotated keys are a listed threat | HashiCorp Vault / cloud secret manager | Large |
-| Low | Governance | Compliance crosswalk (NIST AI RMF, CSF 2.0, ISO 42001, EU AI Act, BFS) | Auditors ask which control covers which requirement | Generated mapping per finding / control | Small |
-| Low | Developer | IDE plug-ins | Catch issues while typing | Semgrep / Sonar IDE extensions | Small |
-| Low | Testing | Fuzzing of parsers and APIs | Finds crashes and memory bugs static tools miss | Atheris, Schemathesis | Medium |
-| Low | Auth engine | PIP / PAP components | Context-aware decisions and a policy admin interface | OPA / Cedar with an admin UI | Large |
-| Low | People & process | Threat modelling, manual penetration test, code review, security training, incident-response runbook, access reviews | Tools find known patterns; people find design flaws and handle incidents | Recurring human activities | Ongoing |
+16 done, 6 partly, 1 documented only, 7 planned and not built (30 items incl. extras and the pen-test gaps).
+
+| Priority | Area | Check | Status | What exists / what is missing |
+|---|---|---|---|---|
+| High | Secrets | Scan git history, not just the current files | Done | SEC_GITLEAKS_HISTORY: verified, shallow clones flagged |
+| High | Supply chain | SBOM generation + licence compliance | Done | SEC_SBOM and Trivy licences: verified; licence data only where manifests carry it |
+| High | Supply chain | Automated dependency-update pull requests | Done | secscan init generates the config; GitHub's service not run here |
+| High | Process | Enforce remediation SLAs and create tickets | Done | Gate + dashboard verified; tickets and alerts tested against mock servers |
+| High | DAST | Authenticated and body-aware API testing | Done | Both verified; ZAP token reaches every request, fuzzer found 5xx on the sample |
+| Medium | Supply chain | Image signing, build provenance, pinned CI actions | Partly | zizmor + pinned templates verified; signing/provenance and Scorecard are templates, never run |
+| Medium | Kubernetes | Cluster posture and CIS benchmarks | Partly | Manifests (kubescape) and CIS Docker benchmark verified; live-cluster commands documented only |
+| Medium | Cloud / IaC | Terraform / CloudFormation and cloud-posture checks | Partly | Terraform / CloudFormation verified; Prowler workflow is a template (no cloud account) |
+| Medium | Exposure | External attack-surface and TLS checks | Done | Verified on mock servers and a live container; nuclei / testssl not used |
+| Medium | Runtime | Runtime threat detection and alerting | Partly | Webhooks verified (mock); Falco rules validated but never run live; SIEM wiring is a recipe |
+| Medium | AI | Real-LLM red teaming + content-safety datasets | Partly | BeaverTails and Aegis wired (dry-run); no real model run: needs an approved endpoint |
+| Medium | AI | Output integrity / hallucination validation | Done | Library + optional probe, unit tested; you supply the certified source values |
+| Medium | AI | Agent code-execution sandbox | Done | Verified on real Docker against hostile code; gVisor untested |
+| Medium | Data | Data classification, stronger PII detection, retention and residency checks | Done | Libraries unit tested; Presidio optional; wiring is the platform's |
+| Medium | Secrets | Vault integration and rotation checks | Done | Verified against a real Vault dev server; cloud secret managers not implemented |
+| Low | Governance | Compliance crosswalk (NIST AI RMF, CSF 2.0, ISO 42001, EU AI Act, BFS) | Done | Verified; heuristic mapping, not a compliance verdict |
+| Low | Developer | IDE plug-ins | Done | Template files written by init; not exercised in an IDE |
+| Low | Testing | Fuzzing of parsers and APIs | Partly | API fuzzing verified; parser fuzzing (Atheris) not implemented |
+| Low | Auth engine | PIP / PAP components | Done | Libraries unit tested; no admin UI |
+| Low | People & process | Threat modelling, manual penetration test, code review, security training, incident-response runbook, access reviews | Documented | Templates and checklists only: people have to run them |
+| High | Extra | GitHub repository settings check (branch protection, secret scanning ...) | Done | Added beyond the roadmap; verified on a real repo and mock API |
+| Medium | Extra | GitHub Actions security (zizmor) | Done | Added beyond the roadmap; verified |
+| Medium | Extra | Non-constant-time secret comparison rule | Done | Added beyond the roadmap; verified |
+| High | Pen test | Port and service discovery (Nmap) on authorised hosts | Planned | Exposure scan covers a fixed list of risky ports only; full discovery not built |
+| High | Pen test | Known-CVE and misconfiguration templates (Nuclei) | Planned | ZAP baseline only today |
+| High | Pen test | Authorisation test pack (BOLA / IDOR, role escalation) | Planned | Schemathesis fuzzing does not check who may see which object |
+| Medium | Pen test | Deep TLS testing | Planned | Basic TLS check exists in the exposure scan |
+| Medium | Pen test | Session and token testing (JWT, cookies, rate limits, lockout) | Planned | Not covered |
+| Medium | Pen test | Subdomain / asset discovery and DNS-email checks (SPF, DKIM, DMARC, takeover) | Planned | Not covered |
+| Low | Pen test | Mobile application testing | Planned | Decide after the asset inventory |
 
 ## 6. How we know the framework itself works
 
 | Suite | What it proves | Checks |
 |---|---|---|
-| scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard | 16 |
+| scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates | 21 |
 | scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers | 83 |
 | scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode | 46 |
+| scripts/test-newtools.sh | SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP | 22 |
 | scripts/e2e-agent.sh | Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain | 12 |
-| scripts/test_gate.py | Finding identity, de-duplication, exclusions, waivers (unit) | 19 |
-| scripts/test_toolplan.py | Presets, per-tool switches, required-tool lock, waivers (unit) | 14 |
-| scripts/test_dashboard.py | Dashboard auth, ingest, hostile input, views, publisher (unit) | 10 |
+| scripts/test_gate.py | Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit) | 28 |
+| scripts/test_toolplan.py | Presets, per-tool switches, required-tool lock, waivers (unit) | 16 |
+| scripts/test_dashboard.py | Dashboard auth, ingest, hostile input, views, SLA, alerts, publisher (unit) | 20 |
+| scripts/test_tickets.py | Ticket creation for Jira / GitHub / Azure Boards against local stand-ins (unit) | 11 |
+| scripts/test_platform_templates.py | Dependabot / Renovate, CI templates pinned and least-privilege, Falco rules, process kit, SLA text (unit) | 10 |
+| scripts/test_tools.py | Exposure, repo-posture and API-fuzz helpers (unit) | 7 |
 | agentic/tests/test_agentsec.py | Runtime-controls library (unit) | 24 |
-| **Total** |  | **224** |
+| agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
+| agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
+| agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
+| **Total** |  | **379** |

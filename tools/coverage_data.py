@@ -1,7 +1,7 @@
 """Single source of truth for docs/security-test-coverage.xlsx and docs/test-coverage.md (see build_coverage.py).
 Edit here, re-run `python3 tools/build_coverage.py`. Status words are used by COUNTIF formulas in the workbook: keep them exact."""
 
-V, VP, WN, TP, RL, NE = "Verified", "Verified (partial)", "Wired, not run", "Template", "Reference library", "Not enforced"
+V, VP, WN, TP, RL, NE, DOC = "Verified", "Verified (partial)", "Wired, not run", "Template", "Reference library", "Not enforced", "Documented"
 
 # (category, check, what it detects, applies to, stage, status, notes / limits)
 INVENTORY = [
@@ -79,7 +79,7 @@ INVENTORY = [
  ("AI agent: red-team probes", "DeepTeam (OWASP Agents 2026, OWASP LLM, NIST AI RMF, MITRE ATLAS, EU AI Act)", "LLM-driven attack simulation mapped to 5 frameworks", "running agent (QA)", "QA / pre-release", TP, "Wiring verified with --dry-run; never run with a real LLM; BeaverTails and Aegis not included"),
  ("AI agent: red-team probes", "promptfoo red-team config", "LLM-driven red team (alternative tool)", "running agent (QA)", "QA / pre-release", TP, "Not run at all"),
  # ---- Runtime library
- ("AI agent: runtime controls (library)", "agentsec.policy (PDP / PEP)", "Default-deny authorisation, roles, scopes, ownership (cross-tenant) and human-approval gate", "your agent code", "runtime", RL, "24 unit tests; you wire it into your platform"),
+ ("AI agent: runtime controls (library)", "agentsec.policy (PDP / PEP / PIP)", "Default-deny authorisation, roles, scopes, ownership (cross-tenant), human-approval gate, and context providers (PIP) that fail closed", "your agent code", "runtime", RL, "Unit tested; you wire it into your platform"),
  ("AI agent: runtime controls (library)", "agentsec.guard", "Fail-closed guardrail enforcement (errors, timeouts, None all block)", "your agent code", "runtime", RL, ""),
  ("AI agent: runtime controls (library)", "agentsec.paths", "Safe path resolution (blocks traversal / symlink escape)", "your agent code", "runtime", RL, ""),
  ("AI agent: runtime controls (library)", "agentsec.egress", "Allow-listed outbound fetch, public IPs only, redirect re-validation, TLS", "your agent code", "runtime", RL, ""),
@@ -96,10 +96,47 @@ INVENTORY = [
  ("Gate, policy & reporting", "Fail-closed on tool errors", "A broken scanner never looks like a pass", "all", "PR / release", V, ""),
  ("Gate, policy & reporting", "Reports: HTML, markdown, JSON, SARIF", "One report per scan; SARIF for code-scanning UIs", "all", "every scan", V, ""),
  ("Gate, policy & reporting", "Central dashboard", "Portfolio and per-repo view across all tools; stale and tool-problem detection", "all", "continuous", V, "One shared login; no alerting"),
- ("Gate, policy & reporting", "Remediation SLA enforcement", "Policy lists SLA days per severity (Critical 3, High 14 ...)", "all", "-", NE, "Defined in policy.json but not enforced or tracked yet"),
  # ---- Developer workflow
  ("Developer workflow", "Pre-push hook (secscan quick)", "Secrets + code analysis before every git push", "all", "developer machine", V, "secscan hook install"),
  ("Developer workflow", "pre-commit config, PR template, CODEOWNERS snippet", "Local checks and review rules for .security/", "all", "developer machine / PR", V, "Templates; CODEOWNERS team handle is a placeholder"),
+]
+
+INVENTORY += [
+ ("Secrets", "gitleaks (git history)", "Secrets committed in past commits, even if deleted since (grouped per file: commits, first commit, date)", "git checkouts", "PR / push", V, "Newest 3000 commits; shallow clones are flagged as reduced coverage"),
+ ("Dependencies (SCA)", "SBOM (CycloneDX via Trivy)", "Bill of materials of everything that ships", "all stacks", "every scan", V, "File next to the report; component count in the summary"),
+ ("Dependencies (SCA)", "Licence compliance (Trivy)", "Licences on a deny list (AGPL, SSPL ...) or review list (GPL, LGPL ...)", "lockfiles, images", "PR / release", VP, "Only where the manifest or installed package carries licence data: scan the image for full coverage"),
+ ("Container & IaC", "Trivy Terraform / CloudFormation checks", "Public buckets, SSH open to the world, unencrypted or public databases", "IaC files", "PR / push", V, "Proven on examples/iac-sample"),
+ ("Container & IaC", "kubescape (NSA hardening framework)", "Manifest hardening: privilege, root, writable FS, missing limits and policies", "Kubernetes manifests", "PR / push", V, "Advisory (one level below Trivy); skips Helm templates"),
+ ("Container & IaC", "Trivy CIS Docker benchmark", "Image configuration against the CIS Docker benchmark", "Docker images", "release (CD)", V, "Advisory: MEDIUM at most"),
+ ("Container & IaC", "Live cluster posture (kubescape / kube-bench / trivy k8s)", "RBAC, network policy and node configuration of the running cluster", "live cluster", "scheduled", DOC, "Commands in docs/cloud-and-cluster.md; not run: no cluster available"),
+ ("Container & IaC", "Cloud account posture (Prowler)", "Public buckets, open security groups, public load balancers, weak IAM", "cloud account", "scheduled", TP, "Workflow template with OIDC role; not run: no cloud account available"),
+ ("Dynamic testing (DAST)", "ZAP authenticated scans", "Everything behind a login: ZAP sends the bearer token (ZAP_AUTH_TOKEN) on every request", "running web app/API (QA)", "post-deploy QA", V, "Token passed via environment, never on the command line; verified against a 401-without-token server"),
+ ("Dynamic testing (DAST)", "Schemathesis API fuzzing", "Crashes (5xx), operations ignoring authentication, schema violations, using the OpenAPI spec with bodies", "running API (QA)", "post-deploy QA", V, "Found the 500s on the SQLi, deserialisation, SSRF and traversal endpoints of the sample"),
+ ("Dynamic testing (DAST)", "Exposure scan", "Plain HTTP, certificate problems, missing headers, CORS, /.git /.env /metrics /actuator /OTLP, risky open ports", "hosts you own", "post-deploy / scheduled", V, "Stdlib scanner; GET and TCP connect only; catch-all apps do not give false path findings"),
+ ("Supply chain & CI/CD", "zizmor (GitHub Actions security)", "Unpinned actions, script injection, dangerous triggers, excessive token permissions", "GitHub workflows", "PR / push", V, "Offline mode; runs on our own templates (0 findings)"),
+ ("Supply chain & CI/CD", "Repository settings check", "Branch protection / rulesets, secret scanning, push protection, Dependabot alerts, CODEOWNERS, SECURITY.md, workflow permissions", "GitHub repos", "scheduled / PR", V, "Needs GITHUB_TOKEN; some settings need admin rights to read (reported as 'could not check')"),
+ ("Supply chain & CI/CD", "Dependabot / Renovate configuration", "Automatic dependency-update pull requests per ecosystem (generated by secscan init)", "GitHub repos", "setup", VP, "Generated files validated; GitHub's Dependabot service itself not run here"),
+ ("Supply chain & CI/CD", "Image signing + SLSA provenance workflow (cosign)", "Proof that the deployed image is the one CI built", "release pipeline", "release", TP, "Template, pinned to commit SHAs; never run"),
+ ("Supply chain & CI/CD", "OpenSSF Scorecard workflow", "Repository security hygiene score", "GitHub repos", "scheduled", TP, "Template; never run"),
+ ("AI agent: static checks", "agent-scan AG-NET-002", "LLM endpoint whose host/region is outside the approved regions (data residency)", "AI agents", "PR / push", V, "Regions come from configs/agentic/approved-models.json"),
+ ("AI agent: static checks", "Semgrep rule: non-constant-time-compare", "Secret / token / signature compared with == or !=", "AI agents", "PR / push", V, ""),
+ ("AI agent: red-team probes", "RT-OUT-01", "Agent states figures that do not trace to its source data", "running agent (QA)", "QA / pre-release", VP, "Runs only when the contract has output_lineage; otherwise skipped (never counted as a pass)"),
+ ("AI agent: runtime controls (library)", "agentsec.output", "Checks that figures and claims in an answer trace to certified source values; schema check; fail-closed", "your agent code", "runtime", RL, "You supply the source values; unit tested"),
+ ("AI agent: runtime controls (library)", "agentsec.sandbox", "Runs untrusted code in a locked-down container: no network, read-only root, non-root, no capabilities, CPU/memory/pid limits, timeout", "your agent code", "runtime", V, "Verified on real Docker against hostile code (network, fork bomb, memory bomb, host files); gVisor option untested"),
+ ("AI agent: runtime controls (library)", "agentsec.classify", "Classifies text as PUBLIC / INTERNAL / CONFIDENTIAL / RESTRICTED (PHI, MNPI, financial hints, custom rules)", "your agent code", "runtime", RL, "Pattern and keyword based"),
+ ("AI agent: runtime controls (library)", "agentsec.retention", "Retention policy and purge of audit files / tables by age (dry run by default)", "your agent code", "runtime", RL, ""),
+ ("AI agent: runtime controls (library)", "agentsec.state (EncryptedStore)", "Agent memory / conversation state encrypted at rest", "your agent code", "runtime", RL, "Needs the optional 'cryptography' package"),
+ ("AI agent: runtime controls (library)", "agentsec.secrets (env / file / Vault KV v2, RotatingSecret)", "Secret providers with TTL cache, AppRole login, rotation age tracking; secrets never printed", "your agent code", "runtime", V, "Verified against a real HashiCorp Vault dev server; cloud secret managers not implemented"),
+ ("AI agent: runtime controls (library)", "agentsec.policy_admin (PAP)", "Validate, version, enable/disable policies with an audit trail; CLI validator", "your agent code", "runtime", RL, ""),
+ ("Gate, policy & reporting", "Compliance crosswalk", "Maps every finding to the architectural control it evidences and to NIST AI RMF, CSF 2.0, ISO 42001, OWASP LLM, EU AI Act, supervisory themes", "all", "every scan", V, "Heuristic mapping, not a compliance verdict; crosswalk.csv per scan"),
+ ("Gate, policy & reporting", "Remediation SLA enforcement (dated baseline)", "A baselined finding older than its SLA blocks again (Critical 3 d, High 14 d ...)", "all", "PR / release", V, "Old-format baselines never age: re-create once with secscan baseline"),
+ ("Gate, policy & reporting", "Dashboard SLA tracking", "First-seen per finding across scans; overdue tiles, per-repo SLA table", "all", "continuous", V, "Starts counting at the first publish after the upgrade"),
+ ("Gate, policy & reporting", "Alert webhooks (Slack / Teams compatible)", "Gate flips to FAIL, new Critical, SLA newly breached, stale repo", "all", "continuous", V, "Tested against mock receivers; not against a real Slack / Teams"),
+ ("Gate, policy & reporting", "Ticket creation (GitHub / Jira / Azure DevOps)", "Issues for new or overdue Critical/High findings, de-duplicated, dry-run by default", "all", "on demand / scheduled", V, "Tested against mock servers; not against real tenants"),
+ ("Developer workflow", "IDE recommendations (.vscode)", "Recommended Sonar / Semgrep extensions and settings written by secscan init", "developer machine", "setup", TP, "Files validated; not exercised in an IDE"),
+ ("Detection & response", "Falco rules for agent workloads", "Runtime detection: shells in agent containers, unexpected egress, credential-file reads and more", "Kubernetes nodes", "runtime", TP, "Falco's own validator accepts the 7 rules; never run on a live node"),
+ ("Detection & response", "SIEM shipping recipe (Sentinel / Datadog)", "Forward Falco alerts and the agent audit log to the SIEM", "platform", "runtime", DOC, "Recipe in docs/runtime-detection.md; not a tested setup"),
+ ("Process & governance", "Process kit (9 documents)", "Threat-model template, incident-response runbook, access-review checklist, training plan, pen-test scope, secure code-review checklist, security-champions guide, vulnerability-management policy", "teams", "recurring", DOC, "Documents only: people have to run them; SLA numbers are tested against policy.json"),
 ]
 
 CATEGORY_NOTES = {
@@ -113,18 +150,32 @@ CATEGORY_NOTES = {
  "AI agent: runtime controls (library)": "Reusable code that gives an agent guardrails, authorisation, audit.",
  "Gate, policy & reporting": "Decides pass/fail, reports and tracks results.",
  "Developer workflow": "Catches problems on the developer's machine before CI.",
+ "Supply chain & CI/CD": "Can our pipeline or our dependencies be tampered with?",
+ "Detection & response": "Would we notice and react if something went wrong in production?",
+ "Process & governance": "Do people have the procedures that tools cannot provide?",
 }
+
+CATEGORY_ORDER = ["Secrets", "Code analysis (SAST)", "Dependencies (SCA)", "Container & IaC", "Dynamic testing (DAST)", "Supply chain & CI/CD", "AI agent: static checks",
+                  "AI agent: red-team probes", "AI agent: runtime controls (library)", "Gate, policy & reporting", "Developer workflow", "Detection & response", "Process & governance"]
+INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the original order inside a category
 
 # our own regression tests (what proves the framework works)
 SUITES = [
- ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard", 16),
+ ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates", 21),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
  ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode", 46),
+ ("scripts/test-newtools.sh", "SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP", 22),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
- ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers (unit)", 19),
- ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers (unit)", 14),
- ("scripts/test_dashboard.py", "Dashboard auth, ingest, hostile input, views, publisher (unit)", 10),
+ ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),
+ ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers (unit)", 16),
+ ("scripts/test_dashboard.py", "Dashboard auth, ingest, hostile input, views, SLA, alerts, publisher (unit)", 20),
+ ("scripts/test_tickets.py", "Ticket creation for Jira / GitHub / Azure Boards against local stand-ins (unit)", 11),
+ ("scripts/test_platform_templates.py", "Dependabot / Renovate, CI templates pinned and least-privilege, Falco rules, process kit, SLA text (unit)", 10),
+ ("scripts/test_tools.py", "Exposure, repo-posture and API-fuzz helpers (unit)", 7),
  ("agentic/tests/test_agentsec.py", "Runtime-controls library (unit)", 24),
+ ("agentic/tests/test_agentsec_extra.py", "Lineage, classification, retention, encrypted store, policy admin, network egress (unit)", 54),
+ ("agentic/tests/test_sandbox_docker.py", "Agent code-execution sandbox in real Docker: no network, read-only, limits", 17),
+ ("agentic/tests/test_vault_docker.py", "Vault secrets and rotation against a real Vault container", 8),
 ]
 
 C, P, N = "Covered", "Partial", "Not covered"
@@ -244,28 +295,81 @@ PRESENTATION = [
  ("Auth engine (PDP/PEP)", "Agent sandbox execution (linked design doc)", "-", N, "Not provided"),
 ]
 
+# Items that changed status when the roadmap was implemented (section, item) -> (what we provide, status, gap / next step)
+_UPD = {
+ ("Key pillars", "2. Tool isolation & sandboxing"): ("agentsec.sandbox: locked-down container runner (verified on Docker); detection of code/shell tools", C, "Reference runner: your platform must route agent code execution through it; gVisor option untested"),
+ ("Key pillars", "7. Runtime observability & auditing"): ("Hash-chained AuditLog, retention purge, Falco rules and SIEM recipe (templates), alert webhooks", P, "Trace collection and reasoning-path capture are app specific; Falco/SIEM wiring never run live"),
+ ("Key pillars", "8. Data protection, governance & cryptography"): ("PII masking, classification, retention, encrypted state, Vault-backed secrets, region check, crosswalk", C, "Libraries to wire in; no cloud secret-manager providers"),
+ ("Key pillars", "4. Continuous agent red teaming"): ("18 deterministic probes + RT-OUT-01; DeepTeam templates for 7 frameworks incl. BeaverTails and Aegis; scheduled workflow", P, "LLM-driven tools never run with a real model (needs an approved endpoint)"),
+ ("Threat catalog P2", "Malicious OS-level code execution"): ("RT-EXEC-01, AG-TOOL-001, tool-param-to-exec, agentsec.sandbox", C, "Sandbox is a reference runner; wire it in"),
+ ("Threat catalog P3", "Erroneous analytical output (hallucination)"): ("agentsec.output (figure lineage, schema checks), RT-OUT-01", P, "You supply the certified source values; no domain evaluation sets"),
+ ("Threat catalog P4", "Telemetry & trigger exposure"): ("Exposure scan (OTLP endpoints and ports, /metrics, actuator, docs), RT-NET-01", C, "Reports what is reachable from where the scan runs"),
+ ("Threat catalog P5", "Cryptographic key compromise"): ("Hardcoded-key detection, non-constant-time-compare rule, secret age in history scan, RotatingSecret", C, "Rotation is enforced by your platform, not by the scan"),
+ ("Threat catalog P5", "Unencrypted agent state & memory at rest"): ("agentsec.state EncryptedStore", P, "Library only: no detector for unencrypted stores"),
+ ("Threat catalog P6", "Third-party supply-chain compromise"): ("SCA, SBOM, licences, workflow security (zizmor), repo settings, Dependabot/Renovate config, pin checks", C, "Image signing / provenance are templates"),
+ ("Threat catalog P7", "Sensitive data exposure to a third-party model"): ("AG-NET-001/002 endpoint and region approval, classify(), redact()", P, "Heuristic classification; no DLP"),
+ ("Threat catalog P7", "Data residency & retention breach"): ("AG-NET-002 region check, retention purge", C, "Region check is static; retention runs where you schedule it"),
+ ("Threat catalog P8", "Undetected agent compromise"): ("Falco rules (template), alert webhooks, hash-chained audit log", P, "Falco never run on a live node; no behavioural baseline"),
+ ("Architectural controls", "P2 Hardened Execution Sandbox"): ("agentsec.sandbox (verified on Docker)", C, "Reference runner; gVisor option untested"),
+ ("Architectural controls", "P3 Output Integrity & Lineage"): ("agentsec.output, RT-OUT-01", P, "Needs your source values and contract"),
+ ("Architectural controls", "P5 Secrets Lifecycle & Key Management"): ("Detection, redact(), Vault KV v2 provider (verified), RotatingSecret", C, "Cloud secret managers not implemented"),
+ ("Architectural controls", "P6 Supply Chain Assurance"): ("SCA, pin checks, modelscan, SBOM, licences, zizmor, repo settings, Dependabot config", P, "Signing / provenance workflow is a template, never run"),
+ ("Architectural controls", "P4 Container & Cluster Hardening"): ("Trivy Dockerfile / K8s / image, kubescape, CIS Docker benchmark; live-cluster commands documented", P, "Live cluster and default-deny policy are not scanned by the pipeline"),
+ ("Architectural controls", "P7 Data Protection & Minimisation"): ("redact(), classify(), retention, logging rule", P, "No minimisation workflow"),
+ ("Architectural controls", "P8 Continuous Assurance & Detection"): ("Red-team probes on a schedule, Falco rules (template), alert webhooks", P, "No production detection verified"),
+ ("Governance crosswalk", "NIST AI RMF / NIST CSF 2.0 / ISO 42001 / EU AI Act / BFS themes mapping"): ("configs/compliance/crosswalk.json: 17 controls mapped to the standards; every finding tagged; Compliance view table + crosswalk.csv", C, "Heuristic: shows evidence, not a compliance verdict"),
+ ("Red-team frameworks", "BeaverTails"): ("DeepTeam template (dry-run verified)", P, "Not run with a real LLM"),
+ ("Red-team frameworks", "Aegis"): ("DeepTeam template (dry-run verified)", P, "Not run with a real LLM"),
+ ("DevSecOps pipeline", "Runtime DAST & API testing"): ("ZAP baseline / API / full, authenticated scans, Schemathesis API fuzzing, exposure scan", C, "QA only; fuzzing finds crashes and contract breaks, not business-logic flaws"),
+ ("DevSecOps pipeline", "Automated PR remediation (Snyk-style fix PRs)"): ("secscan init writes dependabot.yml per ecosystem (and a Renovate template)", C, "GitHub's Dependabot service itself not run here"),
+ ("DevSecOps pipeline", "IDE extension scanners"): ("secscan init writes .vscode recommendations (Sonar, Semgrep)", P, "Template; not exercised in an IDE"),
+ ("DevSecOps pipeline", "eBPF runtime observability"): ("Falco rules for agent workloads (eBPF/kernel based) and a shipping recipe", P, "Template: validated by Falco's rule validator, never run on a live node"),
+ ("DevSecOps pipeline", "Dynamic secret rotation"): ("Vault provider + RotatingSecret (verified against Vault)", P, "Your platform must wire it; no cloud secret managers"),
+ ("DevSecOps pipeline", "Private cluster ingress"): ("Exposure scan shows what is publicly reachable; Kubernetes checks on manifests", P, "Ingress design itself is infrastructure"),
+ ("DevSecOps pipeline", "7-day remediation SLAs, Jira tickets, executive tracking"): ("Dated baseline enforces SLAs at the gate, dashboard SLA tracking and alerts, ticket creation for GitHub / Jira / Azure", C, "Tested with mock servers; not against real tenants"),
+ ("DevSecOps pipeline", "Infra findings: public OTEL endpoints, unnecessary internet-facing load balancers"): ("Exposure scan (OTLP, ports), cloud-posture workflow template (load balancers)", P, "Cloud posture (Prowler) is a template, never run"),
+ ("Auth engine (PDP/PEP)", "PIP: policy information point"): ("Context providers in agentsec.policy (fail closed on provider error)", C, "Reference implementation"),
+ ("Auth engine (PDP/PEP)", "PAP: policy administration point (UI / API)"): ("agentsec.policy_admin: PolicyStore (validate, version, enable/disable, audited) and CLI validator", P, "No admin UI"),
+ ("Auth engine (PDP/PEP)", "Agent sandbox execution (linked design doc)"): ("agentsec.sandbox", C, "Reference runner"),
+}
+PRESENTATION = [(r[0], r[1]) + _UPD.get((r[0], r[1]), r[2:]) for r in PRESENTATION]
+
 # (priority, area, missing check, why it matters, suggested tool, effort)
 ROADMAP = [
- (1, "Secrets", "Scan git history, not just the current files", "A secret deleted in a later commit is still in the history and still valid", "gitleaks git mode", "Small"),
- (1, "Supply chain", "SBOM generation + licence compliance", "Know exactly what ships; block disallowed licences; answer 'are we affected by CVE-X?' in minutes", "Trivy / Syft (CycloneDX, SPDX)", "Small"),
- (1, "Supply chain", "Automated dependency-update pull requests", "Turns the report into fixes (presentation: Snyk-style remediation)", "Dependabot or Renovate", "Small"),
- (1, "Process", "Enforce remediation SLAs and create tickets", "Findings only get fixed when they have an owner and a deadline; policy lists SLAs but nothing enforces them", "Dashboard age tracking + Jira / Azure Boards / GitHub issues", "Medium"),
- (1, "DAST", "Authenticated and body-aware API testing", "Most real bugs sit behind login; current ZAP runs are unauthenticated", "ZAP automation plans, Schemathesis (from OpenAPI)", "Medium"),
- (2, "Supply chain", "Image signing, build provenance, pinned CI actions", "Proves the image you deploy is the one you built; stops tampered CI steps", "cosign, SLSA provenance, zizmor / pinact, OpenSSF Scorecard", "Medium"),
- (2, "Kubernetes", "Cluster posture and CIS benchmarks", "Manifests are scanned, but the live cluster (RBAC, network policy) is not", "Kubescape, kube-bench, Trivy compliance profiles", "Medium"),
- (2, "Cloud / IaC", "Terraform / CloudFormation and cloud-posture checks", "Public buckets, open security groups, unnecessary load balancers (presentation item)", "Trivy config / Checkov, Prowler", "Medium"),
- (2, "Exposure", "External attack-surface and TLS checks", "Finds public OTEL / debug endpoints and weak TLS from the outside", "nuclei, nmap, testssl.sh", "Medium"),
- (2, "Runtime", "Runtime threat detection and alerting", "Spots a compromised agent or container in production (presentation: eBPF, SIEM)", "Falco / Tetragon, Sentinel / Datadog integration", "Large"),
- (2, "AI", "Real-LLM red teaming + content-safety datasets", "The mock-LLM tests prove app controls, not model robustness", "DeepTeam / promptfoo with an approved model; BeaverTails, Aegis", "Medium"),
- (2, "AI", "Output integrity / hallucination validation", "Plausible wrong numbers reaching a business decision (OWASP LLM09)", "Schema + source-lineage checks, evaluation sets", "Large"),
- (2, "AI", "Agent code-execution sandbox", "Contains an agent that is tricked into running code", "gVisor, Firecracker, ephemeral containers", "Large"),
- (2, "Data", "Data classification, stronger PII detection, retention and residency checks", "Regex masking misses names and addresses; no retention or region enforcement", "Microsoft Presidio, DLP tooling", "Large"),
- (2, "Secrets", "Vault integration and rotation checks", "Static unrotated keys are a listed threat", "HashiCorp Vault / cloud secret manager", "Large"),
- (3, "Governance", "Compliance crosswalk (NIST AI RMF, CSF 2.0, ISO 42001, EU AI Act, BFS)", "Auditors ask which control covers which requirement", "Generated mapping per finding / control", "Small"),
- (3, "Developer", "IDE plug-ins", "Catch issues while typing", "Semgrep / Sonar IDE extensions", "Small"),
- (3, "Testing", "Fuzzing of parsers and APIs", "Finds crashes and memory bugs static tools miss", "Atheris, Schemathesis", "Medium"),
- (3, "Auth engine", "PIP / PAP components", "Context-aware decisions and a policy admin interface", "OPA / Cedar with an admin UI", "Large"),
- (3, "People & process", "Threat modelling, manual penetration test, code review, security training, incident-response runbook, access reviews", "Tools find known patterns; people find design flaws and handle incidents", "Recurring human activities", "Ongoing"),
+ (1, "Secrets", "Scan git history, not just the current files", "A secret deleted in a later commit is still in the history and still valid", "gitleaks git mode", "Small", "Done", "SEC_GITLEAKS_HISTORY: verified, shallow clones flagged"),
+ (1, "Supply chain", "SBOM generation + licence compliance", "Know exactly what ships; block disallowed licences; answer 'are we affected by CVE-X?' in minutes", "Trivy (CycloneDX) + licence policy", "Small", "Done", "SEC_SBOM and Trivy licences: verified; licence data only where manifests carry it"),
+ (1, "Supply chain", "Automated dependency-update pull requests", "Turns the report into fixes (presentation: Snyk-style remediation)", "Dependabot or Renovate", "Small", "Done", "secscan init generates the config; GitHub's service not run here"),
+ (1, "Process", "Enforce remediation SLAs and create tickets", "Findings only get fixed when they have an owner and a deadline", "Dated baseline, dashboard SLA tracking, ticket creation", "Medium", "Done", "Gate + dashboard verified; tickets and alerts tested against mock servers"),
+ (1, "DAST", "Authenticated and body-aware API testing", "Most real bugs sit behind login; ZAP runs were unauthenticated", "ZAP auth header, Schemathesis (from OpenAPI)", "Medium", "Done", "Both verified; ZAP token reaches every request, fuzzer found 5xx on the sample"),
+ (2, "Supply chain", "Image signing, build provenance, pinned CI actions", "Proves the image you deploy is the one you built; stops tampered CI steps", "cosign, SLSA provenance, zizmor, OpenSSF Scorecard", "Medium", "Partly", "zizmor + pinned templates verified; signing/provenance and Scorecard are templates, never run"),
+ (2, "Kubernetes", "Cluster posture and CIS benchmarks", "Manifests were scanned, but the live cluster was not", "kubescape, kube-bench, Trivy compliance", "Medium", "Partly", "Manifests (kubescape) and CIS Docker benchmark verified; live-cluster commands documented only"),
+ (2, "Cloud / IaC", "Terraform / CloudFormation and cloud-posture checks", "Public buckets, open security groups, unnecessary load balancers", "Trivy config, Prowler", "Medium", "Partly", "Terraform / CloudFormation verified; Prowler workflow is a template (no cloud account)"),
+ (2, "Exposure", "External attack-surface and TLS checks", "Finds public OTEL / debug endpoints and weak TLS from the outside", "scripts/exposure.py", "Medium", "Done", "Verified on mock servers and a live container; nuclei / testssl not used"),
+ (2, "Runtime", "Runtime threat detection and alerting", "Spots a compromised agent or container in production", "Falco rules, SIEM recipe, alert webhooks", "Large", "Partly", "Webhooks verified (mock); Falco rules validated but never run live; SIEM wiring is a recipe"),
+ (2, "AI", "Real-LLM red teaming + content-safety datasets", "Mock-LLM tests prove app controls, not model robustness", "DeepTeam / promptfoo with an approved model; BeaverTails, Aegis", "Medium", "Partly", "BeaverTails and Aegis wired (dry-run); no real model run: needs an approved endpoint"),
+ (2, "AI", "Output integrity / hallucination validation", "Plausible wrong numbers reaching a business decision (OWASP LLM09)", "agentsec.output, RT-OUT-01", "Large", "Done", "Library + optional probe, unit tested; you supply the certified source values"),
+ (2, "AI", "Agent code-execution sandbox", "Contains an agent that is tricked into running code", "agentsec.sandbox (Docker; gVisor option)", "Large", "Done", "Verified on real Docker against hostile code; gVisor untested"),
+ (2, "Data", "Data classification, stronger PII detection, retention and residency checks", "Regex masking misses names and addresses; no retention or region enforcement", "agentsec.classify / pii / retention / state, AG-NET-002", "Large", "Done", "Libraries unit tested; Presidio optional; wiring is the platform's"),
+ (2, "Secrets", "Vault integration and rotation checks", "Static unrotated keys are a listed threat", "agentsec.secrets (Vault KV v2), RotatingSecret", "Large", "Done", "Verified against a real Vault dev server; cloud secret managers not implemented"),
+ (3, "Governance", "Compliance crosswalk (NIST AI RMF, CSF 2.0, ISO 42001, EU AI Act, BFS)", "Auditors ask which control covers which requirement", "configs/compliance/crosswalk.json + report section", "Small", "Done", "Verified; heuristic mapping, not a compliance verdict"),
+ (3, "Developer", "IDE plug-ins", "Catch issues while typing", "Sonar / Semgrep IDE extensions (.vscode recommendations)", "Small", "Done", "Template files written by init; not exercised in an IDE"),
+ (3, "Testing", "Fuzzing of parsers and APIs", "Finds crashes and memory bugs static tools miss", "Schemathesis (APIs); Atheris (parsers)", "Medium", "Partly", "API fuzzing verified; parser fuzzing (Atheris) not implemented"),
+ (3, "Auth engine", "PIP / PAP components", "Context-aware decisions and a policy admin interface", "agentsec.policy context providers + policy_admin", "Large", "Done", "Libraries unit tested; no admin UI"),
+ (3, "People & process", "Threat modelling, manual penetration test, code review, security training, incident-response runbook, access reviews", "Tools find known patterns; people find design flaws and handle incidents", "docs/process kit", "Ongoing", "Documented", "Templates and checklists only: people have to run them"),
+ (1, "Extra", "GitHub repository settings check (branch protection, secret scanning ...)", "A required scan only blocks if branch protection requires it", "scripts/repo_posture.py", "Small", "Done", "Added beyond the roadmap; verified on a real repo and mock API"),
+ (2, "Extra", "GitHub Actions security (zizmor)", "Script injection and unpinned actions in the pipeline itself", "zizmor", "Small", "Done", "Added beyond the roadmap; verified"),
+ (2, "Extra", "Non-constant-time secret comparison rule", "Timing attacks on token / signature checks (listed in the deck)", "Semgrep rule", "Small", "Done", "Added beyond the roadmap; verified"),
+]
+
+# Penetration-test capabilities found missing when the programme was reviewed against a standard VAPT checklist (added to the plan, not built yet)
+ROADMAP += [
+ (1, "Pen test", "Port and service discovery (Nmap) on authorised hosts", "Forgotten services and old versions are the usual way in", "Nmap", "Small", "Planned", "Exposure scan covers a fixed list of risky ports only; full discovery not built"),
+ (1, "Pen test", "Known-CVE and misconfiguration templates (Nuclei)", "Thousands of maintained checks: exposed panels, default logins, specific CVEs", "Nuclei", "Small", "Planned", "ZAP baseline only today"),
+ (1, "Pen test", "Authorisation test pack (BOLA / IDOR, role escalation)", "Broken access control is the top API risk and scanners rarely find it", "Config-driven script", "Medium", "Planned", "Schemathesis fuzzing does not check who may see which object"),
+ (2, "Pen test", "Deep TLS testing", "Weak ciphers, old protocols, certificate problems", "testssl.sh", "Small", "Planned", "Basic TLS check exists in the exposure scan"),
+ (2, "Pen test", "Session and token testing (JWT, cookies, rate limits, lockout)", "Account takeover and brute force", "Scripted checks + checklist", "Medium", "Planned", "Not covered"),
+ (2, "Pen test", "Subdomain / asset discovery and DNS-email checks (SPF, DKIM, DMARC, takeover)", "Shadow IT and spoofed email", "Passive discovery + stdlib check", "Small", "Planned", "Not covered"),
+ (3, "Pen test", "Mobile application testing", "Only if mobile apps are shipped", "MobSF", "Medium", "Planned", "Decide after the asset inventory"),
 ]
 
 # (term, meaning, covered here?)
@@ -283,3 +387,4 @@ GLOSSARY = [
  ("Governance, risk and compliance", "Policies, SLAs, audits, mapping to standards.", "Gate, exceptions and dashboard; SLA and crosswalk missing"),
  ("People and process", "Training, reviews, threat modelling, penetration tests.", "Not a tool: needs to be run by the team"),
 ]
+

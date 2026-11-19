@@ -32,6 +32,7 @@ CI template: `.security/ci/security-redteam.github.yml` (weekly, manual trigger)
 | `rag_ingest_path` | where documents can be added | indirect-injection probes skipped |
 | `session_read_path` | `/sessions/{id}` | IDOR probe skipped |
 | `admin_path`, `sensitive_paths` | admin/telemetry/docs routes that must not be open | probes skipped |
+| `output_lineage` | `{"message": "What was Q3 revenue?", "source_values": [1234567, 4.1], "tolerance": 0.005}`: a question and the certified numbers its answer may use | RT-OUT-01 skipped |
 | `system_prompt_marker` | a distinctive phrase from **your** system prompt | leak probe skipped |
 | `secret_markers`, `forbidden_markers` | prefix of a secret the agent can see; text your guardrail must block | probes use generic secret patterns / are skipped |
 | `tools.destructive` | names of irreversible tools | agency probes skipped |
@@ -54,6 +55,7 @@ CI template: `.security/ci/security-redteam.github.yml` (weekly, manual trigger)
 | RT-NET-01 | metrics/debug/docs open without credentials | HTTP 200 per path | MEDIUM |
 | RT-GUARD-01 | guardrail fails open | forbidden text passes when the input has unusual characters | HIGH |
 | RT-ERR-01 | stack traces to the client | `Traceback`/file paths in an error body | MEDIUM |
+| RT-OUT-01 | an answer contains a figure that is not in the certified source data | figure in the response that matches none of `output_lineage.source_values` (rounding aware) | HIGH |
 | RT-DOS-01 / 02 | no rate limit / 200 KB input accepted | 60 rapid calls without a 429 / HTTP 200 | MEDIUM / LOW |
 
 ### Safety rails built into the harness
@@ -70,3 +72,6 @@ CI template: `.security/ci/security-redteam.github.yml` (weekly, manual trigger)
 - **promptfoo**: `configs/agentic/promptfooconfig.yaml` (not run or validated here).
 - **Before you use either**: (1) their default models are external (OpenAI): configure an **approved** model so prompts and responses stay inside your boundary (the DeepTeam template refuses to run until you implement `ApprovedModel`); (2) **disable telemetry**: DeepTeam/DeepEval send usage data to Sentry by default (the template sets `DEEPTEAM_TELEMETRY_OPT_OUT=YES` and `DEEPEVAL_TELEMETRY_OPT_OUT=YES` before importing); (3) budget the token cost; (4) install in a separate venv (DeepTeam 1.0.10 needs `sentry-sdk` but does not declare it).
 - Treat their output as leads to triage, not as a gate: LLM judges are non-deterministic. Promote anything real into a deterministic probe or a unit test so it stays fixed.
+
+## DeepTeam frameworks available in the template
+`configs/agentic/deepteam_redteam.py --framework` accepts `owasp-asi` (OWASP Top 10 for Agents 2026), `owasp-llm` (OWASP LLM Top 10 2025), `nist` (NIST AI RMF), `mitre` (MITRE ATLAS), `eu-ai-act`, and the content-safety datasets `beavertails` and `aegis` (downloaded when a run starts). Wiring of all seven is verified with `--dry-run`; **a real run needs an approved model endpoint and has never been executed here**.

@@ -1,5 +1,5 @@
 # Trivy standard config (filesystem scan). DB updates handled by scan.sh cache volume.
 scan:
-  scanners: [vuln, secret, misconfig]
+  scanners: [vuln, secret, misconfig, license]
   skip-dirs: [".security", ".venv", "venv", "node_modules", "build", "dist", ".git", ".pytest_cache"]
 severity: [UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL]

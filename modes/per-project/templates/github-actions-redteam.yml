@@ -14,10 +14,13 @@ jobs:
     runs-on: ubuntu-latest      # EDIT: self-hosted runner if QA is not public
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
       - name: Red-team probes
-        run: .security/secscan redteam --redteam-url "${{ vars.QA_AGENT_URL }}" --redteam-contract .security/redteam.json
+        run: .security/secscan redteam --redteam-url "$QA_AGENT_URL" --redteam-contract .security/redteam.json
         env:
+          QA_AGENT_URL: ${{ vars.QA_AGENT_URL }}
           REDTEAM_TOKEN: ${{ secrets.REDTEAM_TOKEN }}
           REDTEAM_TOKEN_B: ${{ secrets.REDTEAM_TOKEN_B }}
       - name: Show results on the run page
@@ -25,7 +28,7 @@ jobs:
         run: |
           f=$(find .security/reports -maxdepth 2 -name summary.md 2>/dev/null | sort | tail -1)
           [ -n "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
           name: redteam-report

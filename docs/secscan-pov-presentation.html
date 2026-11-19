@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Application and AI Security: Our Point of View</title>
+<style>
+:root{
+  --bg:#0f1723; --panel:#172233; --panel2:#1e2c42; --ink:#e8eef7; --muted:#9fb0c7;
+  --line:#2a3b55; --accent:#4fb3ff; --good:#37c98b; --warn:#f2b84b; --bad:#ff6b6b; --plan:#a78bfa;
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f4f7fb; --panel:#ffffff; --panel2:#eaf1fa; --ink:#14213a; --muted:#56667f; --line:#d3deec;
+        --accent:#0b6fd1; --good:#0d8a5a; --warn:#a86a00; --bad:#c62f2f; --plan:#6a43d6;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.slide{max-width:1180px;margin:0 auto;padding:44px 48px 64px;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+.js .slide{display:none}
+.js .slide.on{display:flex}
+h1{font-size:46px;line-height:1.1;margin:0 0 14px;letter-spacing:-.02em}
+h2{font-size:32px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+h3{font-size:18px;margin:0 0 6px}
+.kick{color:var(--accent);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:13px;margin-bottom:8px}
+.sub{color:var(--muted);font-size:19px;max-width:860px;margin:0 0 24px}
+p{margin:0 0 12px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr} .slide{padding:28px 20px 60px} h1{font-size:34px} h2{font-size:26px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.card p{color:var(--muted);font-size:15px;margin:0}
+.card ul{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:15px}
+.big{font-size:44px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.big small{font-size:15px;font-weight:600;color:var(--muted);display:block;margin-top:6px;letter-spacing:0}
+.tag{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;border:1px solid currentColor;white-space:nowrap}
+.t-ok{color:var(--good)} .t-part{color:var(--warn)} .t-plan{color:var(--plan)} .t-man{color:var(--accent)} .t-gap{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{background:var(--panel2);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td.k{font-weight:650;white-space:nowrap}
+.flow{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+.step{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;position:relative}
+.step b{display:block;color:var(--accent);font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.step span{font-size:14.5px;color:var(--muted)}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:230px 1fr 34px;gap:10px;align-items:center;font-size:14.5px}
+.bar i{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,var(--accent),var(--good))}
+.bar em{font-style:normal;color:var(--muted);text-align:right}
+@media (max-width:700px){.bar{grid-template-columns:130px 1fr 28px;font-size:12.5px}}
+.callout{border-left:4px solid var(--warn);background:var(--panel);padding:12px 16px;border-radius:0 10px 10px 0;color:var(--muted);font-size:15px}
+.callout b{color:var(--ink)}
+.quote{font-size:26px;line-height:1.35;max-width:900px}
+code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:.92em}
+pre{background:var(--panel);border:1px solid var(--line);padding:14px 16px;border-radius:10px;overflow:auto;font-size:14px;line-height:1.5;margin:0}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:12px;padding:10px 18px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(6px);border-top:1px solid var(--line);font-size:13px;color:var(--muted);z-index:5}
+.nav button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit}
+.nav button:hover{border-color:var(--accent)}
+.prog{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.prog div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.nojs .nav{display:none}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:14px}
+@media print{
+  :root{--bg:#fff;--panel:#fff;--panel2:#f1f5fa;--ink:#111;--muted:#444;--line:#bbb}
+  .nav{display:none} .js .slide{display:flex} .slide{min-height:0;page-break-after:always;padding:20px 10px}
+}
+</style>
+</head>
+<body class="nojs">
+
+<!-- 1 -->
+<section class="slide">
+  <div class="kick">Point of view</div>
+  <h1>Finding the weakness before an attacker does</h1>
+  <p class="sub">How we scan, test and attack our own applications and AI agents: automated scanning on every change, penetration testing on every release, and a clear, honest picture of what is and is not covered.</p>
+  <div class="grid g3">
+    <div class="card"><h3>Cyber security</h3><p>Keeping systems and data confidential, correct and available, in people, process and technology.</p></div>
+    <div class="card"><h3>VAPT</h3><p>Vulnerability Assessment (find the weaknesses) plus Penetration Testing (prove which ones an attacker can really use).</p></div>
+    <div class="card"><h3>Our approach</h3><p>One plug-and-play framework for developers, backed by scheduled manual penetration tests for the things tools cannot judge.</p></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="kick">The problem</div>
+  <h2>More code, more dependencies, now autonomous agents</h2>
+  <p class="sub">Every release widens the attack surface. Traditional reviews cannot keep up, and AI agents add risks that classic scanners do not see.</p>
+  <div class="grid g4">
+    <div class="card"><div class="big">80%+<small>of a typical app is third-party code</small></div></div>
+    <div class="card"><div class="big">Hours<small>from a public CVE to active exploitation</small></div></div>
+    <div class="card"><div class="big">1 leak<small>of a key in git can expose a whole cloud account</small></div></div>
+    <div class="card"><div class="big">New<small>prompt injection, tool abuse, poisoned models</small></div></div>
+  </div>
+  <div class="callout" style="margin-top:20px"><b>Illustrative figures.</b> Industry-wide order-of-magnitude numbers used to frame the problem, not measurements from our systems. Our own measured results are on the "evidence" slide.</div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <div class="kick">Foundations</div>
+  <h2>What cyber security means, and where VAPT fits</h2>
+  <p class="sub">Security is the discipline of keeping the CIA triad true against a thinking adversary. VAPT is how we measure whether it is true today.</p>
+  <div class="grid g3">
+    <div class="card"><h3>Confidentiality</h3><p>Only the right people and systems see the data. Threats: leaked secrets, broken access control, exposed databases.</p></div>
+    <div class="card"><h3>Integrity</h3><p>Data and code are not altered without authority. Threats: injection, tampered dependencies, poisoned models, unsigned builds.</p></div>
+    <div class="card"><h3>Availability</h3><p>Services work when needed. Threats: denial of service, ransomware, resource exhaustion, runaway agents.</p></div>
+  </div>
+  <table style="margin-top:20px">
+    <tr><th>Activity</th><th>Question it answers</th><th>Who / how</th><th>Frequency</th></tr>
+    <tr><td class="k">Vulnerability assessment</td><td>What known weaknesses exist, broadly?</td><td>Automated scanners</td><td>Every pull request, nightly</td></tr>
+    <tr><td class="k">Penetration test</td><td>Can an attacker actually get in and what do they reach?</td><td>Skilled tester, tools plus judgement, within agreed scope</td><td>Each major release, at least yearly</td></tr>
+    <tr><td class="k">Red team</td><td>Can we detect and stop a realistic attacker over weeks?</td><td>Independent team, goal-based, stealthy</td><td>Yearly, mature programmes</td></tr>
+    <tr><td class="k">Purple team</td><td>Do our detections catch the attacks we simulate?</td><td>Red and blue together</td><td>Quarterly</td></tr>
+  </table>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="kick">Our point of view</div>
+  <h2>Three layers, each answering a different question</h2>
+  <p class="sub">No single tool or test is enough. Automation gives breadth and speed; humans give depth and judgement; detection covers what slips through.</p>
+  <div class="grid g3">
+    <div class="card"><h3>1. Prevent: automate in the pipeline</h3><p>Secrets, code, dependencies, containers, infrastructure code, workflow files and AI-agent checks run on every pull request. Findings gate the merge by policy.</p></div>
+    <div class="card"><h3>2. Prove: test the running system</h3><p>Dynamic scanning, authenticated API fuzzing and external exposure checks against QA. Manual penetration tests for logic, authorisation and chained attacks.</p></div>
+    <div class="card"><h3>3. Detect and respond</h3><p>Runtime rules, audit trails, alerts and tickets with remediation deadlines, so problems that escape are seen and closed.</p></div>
+  </div>
+  <p class="quote" style="margin-top:28px">Scan every change. Attack every release. Assume something gets through, and be ready to see it.</p>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="kick">The solution</div>
+  <h2>One command for developers, one policy for the organisation</h2>
+  <p class="sub">A developer runs three commands and gets a security report on every pull request. Security owns the rules centrally. Nobody needs to learn ten tools.</p>
+  <div class="flow">
+    <div class="step"><b>1 Install</b><span><code>secscan init</code> detects the stack, adds config and the CI file</span></div>
+    <div class="step"><b>2 Scan</b><span>Right tools picked automatically, pinned scanner images, offline-capable</span></div>
+    <div class="step"><b>3 Gate</b><span>Normalise, de-duplicate, apply baseline and waivers, fail closed</span></div>
+    <div class="step"><b>4 Report</b><span>HTML report, pipeline summary, SBOM, control mapping</span></div>
+    <div class="step"><b>5 Track</b><span>Central dashboard, SLA clocks, alerts, tickets</span></div>
+  </div>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="card"><h3>Starts report-only</h3><p>Nothing breaks a build until the team opts in. Presets: starter, standard, strict.</p></div>
+    <div class="card"><h3>Works on any CI</h3><p>GitHub Actions verified end to end. Jenkins and Azure DevOps templates provided, not yet run on a live server.</p></div>
+    <div class="card"><h3>Honest by design</h3><p>A tool that cannot run is reported as "not run", never as "clean". Required tools cannot be switched off without a dated waiver.</p></div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="kick">Coverage</div>
+  <h2>119 checks across 13 categories</h2>
+  <p class="sub">Every row is classified: 88 verified by test, 6 partly verified, 14 reference library, 7 templates, 1 wired but not run, 3 documented.</p>
+  <div class="bars">
+    <div class="bar"><span>AI agent: static checks</span><i style="width:100%"></i><em>29</em></div>
+    <div class="bar"><span>AI agent: red-team probes</span><i style="width:72%"></i><em>21</em></div>
+    <div class="bar"><span>AI agent: runtime controls</span><i style="width:55%"></i><em>16</em></div>
+    <div class="bar"><span>Gate, policy and reporting</span><i style="width:41%"></i><em>12</em></div>
+    <div class="bar"><span>Container and IaC</span><i style="width:28%"></i><em>8</em></div>
+    <div class="bar"><span>Secrets</span><i style="width:21%"></i><em>6</em></div>
+    <div class="bar"><span>Dependencies (SCA)</span><i style="width:21%"></i><em>6</em></div>
+    <div class="bar"><span>Dynamic testing (DAST)</span><i style="width:21%"></i><em>6</em></div>
+    <div class="bar"><span>Supply chain and CI/CD</span><i style="width:17%"></i><em>5</em></div>
+    <div class="bar"><span>Code analysis (SAST)</span><i style="width:14%"></i><em>4</em></div>
+    <div class="bar"><span>Developer workflow</span><i style="width:10%"></i><em>3</em></div>
+    <div class="bar"><span>Detection and response</span><i style="width:7%"></i><em>2</em></div>
+    <div class="bar"><span>Process and governance</span><i style="width:3%"></i><em>1</em></div>
+  </div>
+  <p style="margin-top:14px;color:var(--muted);font-size:14px">Full inventory with status and limits: <code>docs/test-coverage.md</code> and <code>docs/security-test-coverage.xlsx</code>.</p>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="kick">Vulnerability assessment, automated today</div>
+  <h2>What the pipeline finds on every pull request</h2>
+  <table>
+    <tr><th>Area</th><th>Looks for</th><th>Tools</th></tr>
+    <tr><td class="k">Secrets</td><td>Keys, tokens, passwords in files and in git history</td><td>gitleaks, Trivy</td></tr>
+    <tr><td class="k">Code (SAST)</td><td>Injection, unsafe functions, weak crypto, non-constant-time secret compare</td><td>Semgrep, Bandit, ESLint security, SonarQube</td></tr>
+    <tr><td class="k">Dependencies (SCA)</td><td>Known CVEs, disallowed licences, SBOM (CycloneDX)</td><td>pip-audit, npm audit, Trivy</td></tr>
+    <tr><td class="k">Containers</td><td>Image CVEs, Dockerfile misconfiguration, CIS Docker checks</td><td>Trivy</td></tr>
+    <tr><td class="k">Infrastructure as code</td><td>Terraform, CloudFormation, Kubernetes manifests, cluster posture</td><td>Trivy, kubescape</td></tr>
+    <tr><td class="k">CI/CD and repo</td><td>Unsafe workflows, unpinned actions, missing branch protection, no CODEOWNERS or SECURITY.md</td><td>zizmor, GitHub API check</td></tr>
+    <tr><td class="k">Models</td><td>Malicious pickled model files</td><td>modelscan</td></tr>
+  </table>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="kick">Penetration testing, automated part</div>
+  <h2>Testing the running system, not just the source</h2>
+  <div class="grid g2">
+    <div class="card"><h3>Dynamic scan (DAST) <span class="tag t-ok">Verified</span></h3><p>OWASP ZAP baseline against a running QA app; authenticated mode with a bearer token that is never written to logs. Verified on a real FastAPI application.</p></div>
+    <div class="card"><h3>API fuzzing <span class="tag t-ok">Verified</span></h3><p>Schemathesis generates hostile requests from the OpenAPI spec (bad types, boundaries, auth headers) and reports crashes and contract violations.</p></div>
+    <div class="card"><h3>External exposure <span class="tag t-ok">Verified</span></h3><p>TLS configuration, security headers, CORS, sensitive paths, risky open ports. On a real host it found Redis and PostgreSQL reachable from the network.</p></div>
+    <div class="card"><h3>AI agent red teaming <span class="tag t-part">Partly verified</span></h3><p>21 attack probes (prompt injection, tool abuse, data leakage) against a running agent. Verified against a sample agent; a real-LLM run needs an approved model.</p></div>
+  </div>
+  <div class="callout" style="margin-top:18px"><b>Authorisation first.</b> Active testing is run only against systems we own, in QA, with written scope. Production attack testing is never automatic.</div>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <div class="kick">VAPT lifecycle</div>
+  <h2>Every stage of a penetration test, and who does it</h2>
+  <p class="sub">A real engagement follows a standard sequence. This is how our programme covers each stage today.</p>
+  <table>
+    <tr><th>Stage</th><th>What happens</th><th>Our coverage</th><th>Status</th></tr>
+    <tr><td class="k">1. Scoping and rules of engagement</td><td>Targets, dates, permitted techniques, contacts, stop conditions, written authorisation</td><td>Process template and checklist</td><td><span class="tag t-man">Manual</span></td></tr>
+    <tr><td class="k">2. Reconnaissance</td><td>Map hosts, subdomains, technologies, exposed services, leaked data</td><td>Exposure scan covers named targets. Asset and subdomain discovery to add</td><td><span class="tag t-part">Partial</span></td></tr>
+    <tr><td class="k">3. Scanning and enumeration</td><td>Ports, services, versions, known CVEs, misconfigurations, TLS</td><td>ZAP, exposure scan, Trivy. Nmap, Nuclei, testssl.sh to add</td><td><span class="tag t-part">Partial</span></td></tr>
+    <tr><td class="k">4. Exploitation</td><td>Prove a weakness is usable: injection, broken access control, auth bypass</td><td>ZAP and fuzzing find candidates; humans confirm and chain</td><td><span class="tag t-man">Manual</span></td></tr>
+    <tr><td class="k">5. Post-exploitation</td><td>Privilege escalation, lateral movement, data access, persistence</td><td>Only in a scoped manual test or red team</td><td><span class="tag t-man">Manual</span></td></tr>
+    <tr><td class="k">6. Reporting</td><td>Severity, evidence, reproduction steps, fixes, executive summary</td><td>Report, control mapping, dashboard, tickets</td><td><span class="tag t-ok">Automated</span></td></tr>
+    <tr><td class="k">7. Remediation and retest</td><td>Fix, verify the fix, close with evidence</td><td>SLA clocks, ticket creation, rescan on the next pull request</td><td><span class="tag t-ok">Automated</span></td></tr>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="kick">Penetration test types</div>
+  <h2>Which kinds of penetration test we need, and where we stand</h2>
+  <table>
+    <tr><th>Test type</th><th>Target</th><th>Automated today</th><th>Still needs</th></tr>
+    <tr><td class="k">Web application</td><td>Login, sessions, forms, business logic (OWASP Top 10)</td><td>ZAP baseline and authenticated scan</td><td>Manual logic and access-control testing</td></tr>
+    <tr><td class="k">API</td><td>REST and GraphQL: broken object-level authorisation, mass assignment</td><td>Schemathesis fuzzing</td><td>Role-based BOLA/IDOR test pack, manual abuse cases</td></tr>
+    <tr><td class="k">Network and infrastructure</td><td>Hosts, ports, services, firewalls, internal segments</td><td>Port and TLS exposure checks</td><td>Nmap and Nessus-class scan, internal test</td></tr>
+    <tr><td class="k">Cloud</td><td>IAM, storage, network, logging configuration</td><td>Terraform checks. Prowler workflow template</td><td>Live account run and manual IAM abuse review</td></tr>
+    <tr><td class="k">Containers and Kubernetes</td><td>Images, manifests, cluster, runtime</td><td>Trivy, kubescape on manifests</td><td>Live cluster benchmark and escape testing</td></tr>
+    <tr><td class="k">AI and LLM agents</td><td>Prompt injection, tool misuse, data exfiltration, model supply chain</td><td>21 red-team probes, 29 static checks</td><td>Real-model campaign, human adversarial testing</td></tr>
+    <tr><td class="k">Source code review</td><td>Design flaws tools cannot see</td><td>SAST rules</td><td>Manual secure code review of critical modules</td></tr>
+    <tr><td class="k">Mobile</td><td>Android and iOS apps, local storage, transport</td><td>None</td><td>MobSF plus manual, if we ship mobile apps</td></tr>
+    <tr><td class="k">Social engineering and physical</td><td>Phishing, pretexting, badge and device access</td><td>None</td><td>Awareness testing by the security team or a vendor</td></tr>
+    <tr><td class="k">Red team</td><td>Whole organisation, detection and response</td><td>None</td><td>Annual independent exercise</td></tr>
+  </table>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <div class="kick">Gaps we found in our own plan</div>
+  <h2>Pen-test capabilities that were missing, and the plan to add them</h2>
+  <p class="sub">We reviewed the programme against a standard VAPT checklist. These are the items that were not covered or only partly covered.</p>
+  <table>
+    <tr><th>Capability</th><th>Why it matters</th><th>Plan</th><th>Status</th></tr>
+    <tr><td class="k">Port and service discovery (Nmap)</td><td>Find forgotten services and versions on every host</td><td>Add as an opt-in tool for named, authorised targets</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">Known-CVE and misconfiguration templates (Nuclei)</td><td>Thousands of community checks for exposed panels, default logins, specific CVEs</td><td>Add to the QA scan with a curated, severity-filtered template set</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">Deep TLS testing (testssl.sh)</td><td>Weak ciphers, old protocols, certificate problems</td><td>Extends the existing exposure scan</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">Authorisation test pack (BOLA/IDOR, role escalation)</td><td>Number one API risk; scanners rarely find it</td><td>Config-driven test: user A must not read user B's objects</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">Session and token testing (JWT, cookies, rate limits)</td><td>Account takeover, brute force, token forgery</td><td>Checklist and scripted checks for QA</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">Subdomain and asset discovery</td><td>Shadow IT and forgotten test sites are common entry points</td><td>Passive discovery for company-owned domains</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">DNS and email security (SPF, DKIM, DMARC, takeover)</td><td>Spoofed email, hijacked subdomains</td><td>Small stdlib check</td><td><span class="tag t-plan">Planned</span></td></tr>
+    <tr><td class="k">Guarded SQL injection confirmation (sqlmap)</td><td>Confirm injection candidates found by ZAP</td><td>Manual, QA only, never automatic</td><td><span class="tag t-man">Manual</span></td></tr>
+    <tr><td class="k">Load and denial-of-service resilience</td><td>Availability and runaway-agent cost</td><td>Agreed load test in QA with limits</td><td><span class="tag t-man">Manual</span></td></tr>
+    <tr><td class="k">Mobile app testing (MobSF)</td><td>Only if we ship mobile apps</td><td>Decide after asset inventory</td><td><span class="tag t-gap">Not covered</span></td></tr>
+  </table>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <div class="kick">The human part</div>
+  <h2>Manual penetration testing programme</h2>
+  <p class="sub">Tools find known patterns. A person finds the flaw in how your application is designed. We run both, on a schedule.</p>
+  <div class="grid g3">
+    <div class="card"><h3>When</h3><ul><li>Before each major release</li><li>After large architecture changes</li><li>At least once a year for every internet-facing system</li><li>After a serious incident</li></ul></div>
+    <div class="card"><h3>What testers do</h3><ul><li>Business-logic abuse (skip a payment step, replay a request)</li><li>Authorisation: horizontal and vertical privilege escalation</li><li>Chaining low findings into one serious path</li><li>Threat-model-driven abuse cases</li></ul></div>
+    <div class="card"><h3>Ground rules</h3><ul><li>Written authorisation and scope</li><li>QA or staging first; production only by agreement</li><li>Named contacts and a stop condition</li><li>Data handling and evidence retention rules</li></ul></div>
+  </div>
+  <div class="grid g3" style="margin-top:16px">
+    <div class="card"><h3>Severity</h3><p>CVSS plus business impact. Critical and High have fixed fix-by dates, tracked on the dashboard.</p></div>
+    <div class="card"><h3>Retest</h3><p>Every fixed finding is re-tested and closed with evidence, not trust.</p></div>
+    <div class="card"><h3>Output</h3><p>Executive summary, technical detail with reproduction steps, fix guidance, mapping to controls.</p></div>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="slide">
+  <div class="kick">AI agent security</div>
+  <h2>Pen-testing agents is different</h2>
+  <p class="sub">An agent can read data, call tools and act. The attack is often a sentence, not an exploit.</p>
+  <div class="grid g3">
+    <div class="card"><h3>Prevent in code <span class="tag t-ok">29 static checks</span></h3><ul><li>Unsafe tools (shell, eval, unrestricted HTTP)</li><li>Fail-open guardrails</li><li>Unregistered models, risky MCP servers</li><li>Secrets inside prompts</li><li>Malicious model files</li></ul></div>
+    <div class="card"><h3>Test while running <span class="tag t-part">21 probes</span></h3><ul><li>Direct and indirect prompt injection</li><li>Tool abuse and privilege escalation</li><li>Data and system-prompt leakage</li><li>Jailbreaks and unsafe output</li><li>Run via <code>secscan redteam</code> in QA</li></ul></div>
+    <div class="card"><h3>Contain at runtime <span class="tag t-ok">16 controls</span></h3><ul><li>Identity and scoped permissions</li><li>Docker sandbox for code execution</li><li>Human approval for risky actions</li><li>Tamper-evident audit log</li><li>Output lineage, classification, retention</li></ul></div>
+  </div>
+  <p style="margin-top:16px;color:var(--muted);font-size:15px">Mapped to the OWASP LLM Top 10, NIST AI RMF, ISO 42001 and the EU AI Act through one control crosswalk.</p>
+</section>
+
+<!-- 14 -->
+<section class="slide">
+  <div class="kick">Governance</div>
+  <h2>From finding to fix, with a deadline</h2>
+  <div class="flow">
+    <div class="step"><b>Policy</b><span>Central, version-controlled; teams cannot weaken it silently</span></div>
+    <div class="step"><b>Gate</b><span>Block new Critical and High; old findings recorded in a dated baseline</span></div>
+    <div class="step"><b>Waiver</b><span>Time-boxed, owner and reason recorded, expires automatically</span></div>
+    <div class="step"><b>SLA</b><span>Aged findings block again after the deadline</span></div>
+    <div class="step"><b>Ticket and alert</b><span>Jira, GitHub or Azure Boards; Slack or Teams webhook</span></div>
+  </div>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="card"><h3>Dashboard</h3><p>Central view of every repo: severity trend, overdue findings, tool status. Basic auth, token-protected ingest.</p></div>
+    <div class="card"><h3>Compliance mapping</h3><p>Findings map to controls P1 to P8 and on to NIST CSF, NIST AI RMF, ISO 42001, OWASP LLM and EU AI Act.</p></div>
+    <div class="card"><h3>Evidence</h3><p>SBOM per scan, HTML report, audit chain. Ready for an auditor without extra work.</p></div>
+  </div>
+</section>
+
+<!-- 15 -->
+<section class="slide">
+  <div class="kick">Evidence from real runs</div>
+  <h2>It finds real problems, including in our own work</h2>
+  <div class="grid g3">
+    <div class="card"><div class="big">25 / 430<small>Critical / High findings on a real pilot application (mostly dependencies)</small></div></div>
+    <div class="card"><div class="big">2<small>unintended open database ports (Redis, PostgreSQL) found by the exposure scan on a shared host</small></div></div>
+    <div class="card"><div class="big">4+<small>gaps in our own new repository found by the repo-posture check: no branch protection, CODEOWNERS, SECURITY.md or Dependabot alerts</small></div></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card"><h3>Self-testing</h3><p>Over 350 automated tests across the framework, including end-to-end runs with a deliberately vulnerable agent and a vulnerable FastAPI service. Each fixed bug gets a regression test.</p></div>
+    <div class="card"><h3>Scanner on its own templates</h3><p>The workflow scanner flagged our generated CI templates for unpinned actions; they are now pinned to commit hashes and a test enforces it.</p></div>
+  </div>
+</section>
+
+<!-- 16 -->
+<section class="slide">
+  <div class="kick">Roadmap</div>
+  <h2>30 / 60 / 90 days</h2>
+  <div class="grid g3">
+    <div class="card"><h3>First 30 days: switch it on</h3><ul><li>Onboard pilot repos in report-only</li><li>Record baselines for legacy findings</li><li>Close the cheap wins: secrets, upgrades</li><li>Connect dashboard and ticketing</li><li>Fix exposed ports and repo settings</li></ul></div>
+    <div class="card"><h3>60 days: enforce and extend</h3><ul><li>Turn on the standard gate for pilot repos</li><li>Add Nmap, Nuclei, testssl.sh to QA scans</li><li>Role-based authorisation test pack</li><li>First scheduled manual penetration test</li><li>Live cluster and cloud posture runs</li></ul></div>
+    <div class="card"><h3>90 days: mature</h3><ul><li>Strict release gate with signed images and provenance</li><li>Real-model AI red-team campaign</li><li>Runtime detection wired to the SIEM</li><li>Purple-team exercise</li><li>Quarterly review of waivers and SLAs</li></ul></div>
+  </div>
+</section>
+
+<!-- 17 -->
+<section class="slide">
+  <div class="kick">Honest limits</div>
+  <h2>What we have not proven yet</h2>
+  <table>
+    <tr><th>Item</th><th>State</th></tr>
+    <tr><td class="k">GitHub Actions</td><td><span class="tag t-ok">Verified</span> end to end on a pilot branch</td></tr>
+    <tr><td class="k">Jenkins and Azure DevOps pipelines</td><td><span class="tag t-part">Templates</span> provided, never run on a live server</td></tr>
+    <tr><td class="k">Image signing, SLSA provenance, Scorecard</td><td><span class="tag t-part">Templates</span> not yet run</td></tr>
+    <tr><td class="k">Live Kubernetes and cloud account posture</td><td><span class="tag t-part">Templates</span> and manifest checks only</td></tr>
+    <tr><td class="k">Runtime detection (Falco) and SIEM</td><td><span class="tag t-part">Rules written</span> not deployed on a live node</td></tr>
+    <tr><td class="k">Real-model AI red teaming</td><td><span class="tag t-part">Needs</span> an approved model or endpoint</td></tr>
+    <tr><td class="k">Ticketing and alert webhooks on real tenants</td><td><span class="tag t-part">Tested</span> against local stand-ins only</td></tr>
+    <tr><td class="k">Manual penetration test, red team, social engineering</td><td><span class="tag t-man">Process</span> defined; no test commissioned yet</td></tr>
+  </table>
+  <p style="margin-top:14px;color:var(--muted)">Scanners reduce risk; they do not prove safety. A clean report means "nothing found by these checks", not "secure".</p>
+</section>
+
+<!-- 18 -->
+<section class="slide">
+  <div class="kick">Decisions we need</div>
+  <h2>What would let us move faster</h2>
+  <div class="grid g2">
+    <div class="card"><h3>Scope and authority</h3><ul><li>Which systems are in scope for active testing, and who signs the authorisation</li><li>Approval for network scanning of company-owned ranges</li><li>An approved model endpoint for AI red teaming</li></ul></div>
+    <div class="card"><h3>Ownership</h3><ul><li>Who owns the central policy and the dashboard</li><li>Who receives alerts and triages overdue findings</li><li>Budget for an external penetration-test vendor</li></ul></div>
+    <div class="card"><h3>Environment</h3><ul><li>A CI runner that can reach the dashboard</li><li>A Kubernetes cluster and a cloud account for posture checks</li><li>An internal package index for the installer</li></ul></div>
+    <div class="card"><h3>Repository hygiene</h3><ul><li>Enable branch protection, CODEOWNERS and SECURITY.md on the framework repo</li><li>Tag the first release so teams can pin it</li></ul></div>
+  </div>
+</section>
+
+<div class="nav" id="nav" hidden>
+  <button id="prev" type="button">Prev</button>
+  <button id="next" type="button">Next</button>
+  <div class="prog"><div id="bar"></div></div>
+  <span id="count"></span>
+  <span>arrows or space to move, P to print</span>
+</div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var i=0;
+  var h=parseInt((location.hash||'').replace('#',''),10);
+  if(h>=1&&h<=slides.length)i=h-1;
+  document.body.className='';
+  document.documentElement.className='js';
+  document.getElementById('nav').hidden=false;
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('on',k===i)});
+    document.getElementById('bar').style.width=((i+1)/slides.length*100)+'%';
+    document.getElementById('count').textContent=(i+1)+' / '+slides.length;
+    try{history.replaceState(null,'','#'+(i+1))}catch(e){}
+    window.scrollTo(0,0);
+  }
+  document.getElementById('prev').onclick=function(){show(i-1)};
+  document.getElementById('next').onclick=function(){show(i+1)};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();show(i+1)}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1)}
+    else if(e.key==='Home')show(0);
+    else if(e.key==='End')show(slides.length-1);
+    else if(e.key==='p'||e.key==='P')window.print();
+  });
+  show(i);
+})();
+</script>
+</body>
+</html>

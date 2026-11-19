@@ -16,14 +16,16 @@ import json
 import os
 import sys
 
-ORDER = ["gitleaks", "semgrep", "trivy-fs", "bandit", "pip-audit", "npm-audit", "eslint", "agent-scan", "modelscan",
-         "trivy-image", "dependency-check", "sonarqube", "zap", "redteam"]
+ORDER = ["gitleaks", "gitleaks-history", "semgrep", "trivy-fs", "sbom", "bandit", "pip-audit", "npm-audit", "eslint", "workflow-scan", "agent-scan", "modelscan",
+         "k8s-posture", "trivy-image", "dependency-check", "sonarqube", "zap", "api-fuzz", "exposure", "repo-posture", "redteam"]
 CONFIG_NAME = {"gitleaks": "SEC_GITLEAKS", "semgrep": "SEC_SEMGREP", "trivy-fs": "SEC_TRIVY", "bandit": "SEC_BANDIT",
                "pip-audit": "SEC_PIP_AUDIT", "npm-audit": "SEC_NPM_AUDIT", "eslint": "SEC_ESLINT", "agent-scan": "SEC_AGENT_SCAN",
                "modelscan": "SEC_MODELSCAN", "trivy-image": "SEC_TRIVY_IMAGE", "dependency-check": "SEC_DEPCHECK",
-               "sonarqube": "SEC_SONAR", "zap": "SEC_ZAP", "redteam": "SEC_REDTEAM"}
+               "sonarqube": "SEC_SONAR", "zap": "SEC_ZAP", "redteam": "SEC_REDTEAM", "gitleaks-history": "SEC_GITLEAKS_HISTORY", "sbom": "SEC_SBOM",
+               "workflow-scan": "SEC_WORKFLOW_SCAN", "k8s-posture": "SEC_K8S_POSTURE", "api-fuzz": "SEC_API_FUZZ", "exposure": "SEC_EXPOSURE", "repo-posture": "SEC_REPO_POSTURE"}
 # short names accepted in --modes / the legacy SEC_SKIP list
-ALIAS = {"trivy": "trivy-fs", "sonar": "sonarqube", "depcheck": "dependency-check", "image": "trivy-image"}
+ALIAS = {"trivy": "trivy-fs", "sonar": "sonarqube", "depcheck": "dependency-check", "image": "trivy-image", "history": "gitleaks-history",
+         "workflows": "workflow-scan", "k8s": "k8s-posture", "fuzz": "api-fuzz", "posture": "repo-posture"}
 VALUE = {"auto": "auto", "on": "on", "off": "off", "1": "on", "0": "off", "true": "on", "false": "off", "yes": "on", "no": "off"}
 
 
@@ -88,6 +90,21 @@ def fits(tool, a):
         return bool(a.zap_url), "no QA URL (set SEC_ZAP_URL)"
     if tool == "redteam":
         return bool(a.redteam_url), "no QA agent URL (set SEC_REDTEAM_URL)"
+    facts = set(a.facts)
+    if tool == "gitleaks-history":
+        return "git" in facts, "not a git checkout (a worktree or an export has no history to scan)"
+    if tool == "sbom":
+        return True, ""
+    if tool == "workflow-scan":
+        return "workflows" in facts, "no GitHub Actions workflows"
+    if tool == "k8s-posture":
+        return "k8s" in facts, "no Kubernetes manifests found"
+    if tool == "api-fuzz":
+        return bool(a.api_spec), "no OpenAPI spec URL (set SEC_API_SPEC)"
+    if tool == "exposure":
+        return bool(a.exposure_targets), "no targets (set SEC_EXPOSURE_TARGETS)"
+    if tool == "repo-posture":
+        return "ghrepo" in facts, "no GitHub repository / GITHUB_TOKEN (the check reads repository settings through the API)"
     return True, ""
 
 
@@ -133,7 +150,7 @@ def plan(a):
         else:
             out[t] = dict(run=ok, mode=mode, reason=("applies to this project" if ok else why_not))
         out[t]["explicit"] = t in explicit
-        if out[t]["run"] and t in ("trivy-image", "zap", "redteam", "sonarqube") and mode == "on" and not fits(t, a)[0]:
+        if out[t]["run"] and t in ("trivy-image", "zap", "redteam", "sonarqube", "api-fuzz", "exposure", "repo-posture", "gitleaks-history", "workflow-scan", "k8s-posture") and mode == "on" and not fits(t, a)[0]:
             errors.append(f"{CONFIG_NAME[t]}=on but {why_not}")
     return dict(tools=out, waivers=[dict(tool=t, **{k: e[k] for k in ("reason", "approved_by", "expires")}) for t, e in waivers.items()],
                 errors=errors, preset=a.preset)
@@ -151,9 +168,13 @@ def main():
     ap.add_argument("--zap-url", default="")
     ap.add_argument("--redteam-url", default="")
     ap.add_argument("--model-files", action="store_true")
+    ap.add_argument("--facts", default="", help="comma list of detected facts: git,workflows,k8s,ghrepo")
+    ap.add_argument("--api-spec", default="")
+    ap.add_argument("--exposure-targets", default="")
     ap.add_argument("--partial", action="store_true")
     a = ap.parse_args()
     a.profiles = [p for p in a.profiles.split(",") if p]
+    a.facts = [x for x in a.facts.split(",") if x]
     if a.cmd == "preset":
         p = preset_defaults(json.load(open(a.policy)), a.preset)
         print(p["enforce"], p["gate"])

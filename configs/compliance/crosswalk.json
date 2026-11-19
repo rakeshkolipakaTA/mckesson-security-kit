@@ -1,0 +1,390 @@
+{
+ "_note": "Control -> standards mapping follows the Agentic Security framework's crosswalk table. Findings are assigned to controls by the first matching rules below (all matching rules are unioned). Heuristic: it shows which control a finding evidences, not a compliance verdict.",
+ "controls": {
+  "P1-AUTHZ": {
+   "pillar": "P1",
+   "name": "Centralised Authorization Proxy",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.AA)",
+   "ISO/IEC 42001": "Access control for AI systems",
+   "OWASP LLM Top 10": "LLM02, LLM06",
+   "EU AI Act": "Art. 15 Cybersecurity",
+   "BFS supervisory theme": "IT Governance - Logical Access"
+  },
+  "P1-IDENTITY": {
+   "pillar": "P1",
+   "name": "Agent Identity & Credential Broker",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.AA)",
+   "ISO/IEC 42001": "AI roles & authority",
+   "OWASP LLM Top 10": "LLM06 Excessive Agency",
+   "EU AI Act": "Art. 15 Cybersecurity",
+   "BFS supervisory theme": "IT Governance - Identity & Privileged Access"
+  },
+  "P2-SANDBOX": {
+   "pillar": "P2",
+   "name": "Hardened Execution Sandbox",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.PS)",
+   "ISO/IEC 42001": "AI lifecycle technical controls",
+   "OWASP LLM Top 10": "LLM05, LLM06",
+   "EU AI Act": "Art. 15 Robustness",
+   "BFS supervisory theme": "CSF - Secure Configuration"
+  },
+  "P2-RESILIENCE": {
+   "pillar": "P2",
+   "name": "Resilience & Safe Failure",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT / RECOVER",
+   "ISO/IEC 42001": "AI operation & monitoring",
+   "OWASP LLM Top 10": "LLM10 Unbounded Consumption",
+   "EU AI Act": "Art. 15 Robustness",
+   "BFS supervisory theme": "Business Continuity & Capacity"
+  },
+  "P3-GUARDRAIL": {
+   "pillar": "P3",
+   "name": "Deterministic Guardrail Plane",
+   "NIST AI RMF": "MEASURE / MANAGE",
+   "NIST CSF 2.0": "PROTECT",
+   "ISO/IEC 42001": "AI impact assessment & controls",
+   "OWASP LLM Top 10": "LLM01 Prompt Injection, LLM07",
+   "EU AI Act": "Art. 9 Risk, Art. 15",
+   "BFS supervisory theme": "Model Risk Management"
+  },
+  "P3-IO": {
+   "pillar": "P3",
+   "name": "Trusted I/O Boundary",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.DS)",
+   "ISO/IEC 42001": "Data & input handling for AI",
+   "OWASP LLM Top 10": "LLM05 Output Handling",
+   "EU AI Act": "Art. 15 Robustness",
+   "BFS supervisory theme": "CSF - Application Security"
+  },
+  "P3-OUTPUT": {
+   "pillar": "P3",
+   "name": "Output Integrity & Lineage",
+   "NIST AI RMF": "MEASURE",
+   "NIST CSF 2.0": "GOVERN",
+   "ISO/IEC 42001": "AI accuracy & validation",
+   "OWASP LLM Top 10": "LLM09 Misinformation",
+   "EU AI Act": "Art. 15 Accuracy",
+   "BFS supervisory theme": "Model Validation & Lineage"
+  },
+  "P3-RETRIEVAL": {
+   "pillar": "P3",
+   "name": "Retrieval Corpus Integrity",
+   "NIST AI RMF": "MAP / MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.DS)",
+   "ISO/IEC 42001": "Data for AI systems",
+   "OWASP LLM Top 10": "LLM01, LLM04",
+   "EU AI Act": "Art. 10 Data Governance, Art. 15",
+   "BFS supervisory theme": "Data Integrity & Model Risk"
+  },
+  "P4-EGRESS": {
+   "pillar": "P4",
+   "name": "Egress Control & Network Segmentation",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.IR)",
+   "ISO/IEC 42001": "AI infrastructure controls",
+   "OWASP LLM Top 10": "LLM03 Supply Chain",
+   "EU AI Act": "Art. 15 Cybersecurity",
+   "BFS supervisory theme": "CSF - Network Security"
+  },
+  "P4-HARDEN": {
+   "pillar": "P4",
+   "name": "Container & Cluster Hardening",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.PS)",
+   "ISO/IEC 42001": "AI infrastructure controls",
+   "OWASP LLM Top 10": "LLM03 Supply Chain",
+   "EU AI Act": "Art. 15 Cybersecurity",
+   "BFS supervisory theme": "Secure Configuration Baselines"
+  },
+  "P5-SECRETS": {
+   "pillar": "P5",
+   "name": "Secrets Lifecycle & Key Management",
+   "NIST AI RMF": "MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.DS)",
+   "ISO/IEC 42001": "Protection of AI assets",
+   "OWASP LLM Top 10": "LLM02, LLM08",
+   "EU AI Act": "Art. 15 Cybersecurity",
+   "BFS supervisory theme": "Cryptographic Key Management"
+  },
+  "P6-SUPPLY": {
+   "pillar": "P6",
+   "name": "Supply Chain Assurance",
+   "NIST AI RMF": "MAP / MANAGE",
+   "NIST CSF 2.0": "IDENTIFY (ID.SC)",
+   "ISO/IEC 42001": "Supplier & 3rd-party relationships",
+   "OWASP LLM Top 10": "LLM03 Supply Chain",
+   "EU AI Act": "Art. 15 Cybersecurity",
+   "BFS supervisory theme": "Outsourcing & 3rd-Party Risk"
+  },
+  "P6-MODEL": {
+   "pillar": "P6",
+   "name": "Model Governance & Provenance",
+   "NIST AI RMF": "GOVERN / MAP",
+   "NIST CSF 2.0": "GOVERN / IDENTIFY",
+   "ISO/IEC 42001": "AI lifecycle & 3rd-party AI",
+   "OWASP LLM Top 10": "LLM03, LLM04 Poisoning",
+   "EU AI Act": "Art. 9 Risk, Art. 10 Data",
+   "BFS supervisory theme": "Model Risk & Outsourcing"
+  },
+  "P7-DATA": {
+   "pillar": "P7",
+   "name": "Data Protection & Minimisation",
+   "NIST AI RMF": "MAP / MANAGE",
+   "NIST CSF 2.0": "PROTECT (PR.DS)",
+   "ISO/IEC 42001": "Data for AI systems",
+   "OWASP LLM Top 10": "LLM02 Sensitive Information",
+   "EU AI Act": "Art. 10 Data Governance",
+   "BFS supervisory theme": "DPDP Act & Data Localisation"
+  },
+  "P8-OVERSIGHT": {
+   "pillar": "P8",
+   "name": "Human Oversight & Autonomy Bounds",
+   "NIST AI RMF": "GOVERN / MANAGE",
+   "NIST CSF 2.0": "GOVERN",
+   "ISO/IEC 42001": "Human oversight of AI",
+   "OWASP LLM Top 10": "LLM06 Excessive Agency",
+   "EU AI Act": "Art. 14 Human Oversight",
+   "BFS supervisory theme": "Accountability & Maker-Checker"
+  },
+  "P8-AUDIT": {
+   "pillar": "P8",
+   "name": "Immutable Audit & Non-Repudiation",
+   "NIST AI RMF": "GOVERN / MEASURE",
+   "NIST CSF 2.0": "DETECT / GOVERN",
+   "ISO/IEC 42001": "Records, logging & traceability",
+   "OWASP LLM Top 10": "LLM06, LLM09",
+   "EU AI Act": "Art. 12 Record-Keeping",
+   "BFS supervisory theme": "Audit Trail & Record Retention"
+  },
+  "P8-ASSURANCE": {
+   "pillar": "P8",
+   "name": "Continuous Assurance & Detection",
+   "NIST AI RMF": "MEASURE / MANAGE",
+   "NIST CSF 2.0": "DETECT / RESPOND",
+   "ISO/IEC 42001": "Performance evaluation",
+   "OWASP LLM Top 10": "LLM01, LLM04",
+   "EU AI Act": "Art. 9 Risk, Art. 15",
+   "BFS supervisory theme": "Cyber Ops & Incident Reporting"
+  }
+ },
+ "rules": [
+  [
+   "category",
+   "^Secrets$",
+   [
+    "P5-SECRETS"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-(PROMPT-001|MCP-004)$",
+   [
+    "P5-SECRETS"
+   ]
+  ],
+  [
+   "rule",
+   "mckesson-agent-hardcoded-llm-key",
+   [
+    "P5-SECRETS"
+   ]
+  ],
+  [
+   "category",
+   "^SCA$",
+   [
+    "P6-SUPPLY"
+   ]
+  ],
+  [
+   "category",
+   "^License$",
+   [
+    "P6-SUPPLY"
+   ]
+  ],
+  [
+   "category",
+   "^(SBOM|CI/CD)$",
+   [
+    "P6-SUPPLY"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-MCP-00[12]$",
+   [
+    "P6-SUPPLY"
+   ]
+  ],
+  [
+   "tool",
+   "modelscan",
+   [
+    "P6-MODEL"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-MODEL-|trust-remote-code|unsafe-model-deserialization|unpinned-model-revision",
+   [
+    "P6-MODEL"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-NET-001$",
+   [
+    "P4-EGRESS",
+    "P7-DATA"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-NET-002$",
+   [
+    "P7-DATA"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-MCP-003$",
+   [
+    "P4-EGRESS"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-TOOL-001$|^AG-MCP-005$|dangerous-tool|tool-param-to-exec|^RT-EXEC-",
+   [
+    "P2-SANDBOX"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-TOOL-002$|^RT-AGENCY-",
+   [
+    "P8-OVERSIGHT"
+   ]
+  ],
+  [
+   "rule",
+   "^AG-TOOL-003$|unrestricted-tool-dispatch",
+   [
+    "P1-IDENTITY"
+   ]
+  ],
+  [
+   "rule",
+   "unauthenticated-route|^RT-AUTH-",
+   [
+    "P1-AUTHZ"
+   ]
+  ],
+  [
+   "rule",
+   "guardrail-fail-open|^RT-GUARD-|^RT-INJ-",
+   [
+    "P3-GUARDRAIL"
+   ]
+  ],
+  [
+   "rule",
+   "^RT-INJ-0[23]$",
+   [
+    "P3-RETRIEVAL"
+   ]
+  ],
+  [
+   "rule",
+   "tool-param-to-(file|sql)|llm-output-to-sink|^RT-TOOL-01$",
+   [
+    "P3-IO"
+   ]
+  ],
+  [
+   "rule",
+   "tool-param-to-network|^RT-TOOL-02$",
+   [
+    "P4-EGRESS"
+   ]
+  ],
+  [
+   "rule",
+   "sensitive-data-in-logs",
+   [
+    "P7-DATA",
+    "P5-SECRETS"
+   ]
+  ],
+  [
+   "rule",
+   "^RT-SEC-01$",
+   [
+    "P5-SECRETS"
+   ]
+  ],
+  [
+   "rule",
+   "unbounded-agent-loop|^RT-(DOS|ERR)-",
+   [
+    "P2-RESILIENCE"
+   ]
+  ],
+  [
+   "rule",
+   "^RT-OUT-",
+   [
+    "P3-OUTPUT"
+   ]
+  ],
+  [
+   "rule",
+   "^RT-NET-01$",
+   [
+    "P4-HARDEN"
+   ]
+  ],
+  [
+   "category",
+   "^(IaC/Config|Kubernetes|Exposure)$",
+   [
+    "P4-HARDEN"
+   ]
+  ],
+  [
+   "category",
+   "^(DAST)$",
+   [
+    "P3-IO"
+   ]
+  ],
+  [
+   "category",
+   "^(SAST)$",
+   [
+    "P3-IO"
+   ]
+  ],
+  [
+   "category",
+   "^(Repo posture)$",
+   [
+    "P8-ASSURANCE"
+   ]
+  ],
+  [
+   "tool",
+   "^api-fuzz",
+   [
+    "P3-IO",
+    "P2-RESILIENCE"
+   ]
+  ]
+ ]
+}

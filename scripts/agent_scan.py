@@ -26,6 +26,9 @@ FRAMEWORKS = {
 MODEL_RX = re.compile(r"""["']((?:us\.|eu\.|apac\.)?(?:anthropic\.)?claude-[\w.\-:]+|gpt-[\w.\-]+|o[134](?:-mini|-preview|-pro)?|gemini-[\w.\-]+|mistral-[\w.\-]+|mixtral-[\w.\-]+|llama-?[\w.\-:]*\d[\w.\-:]*|command-r[\w.\-]*|text-embedding-[\w.\-]+|deepseek-[\w.\-]+)["']""", re.I)
 HF_RX = re.compile(r"""from_pretrained\(\s*["']([\w.\-]+/[\w.\-]+)["']""")
 URL_RX = re.compile(r"https?://([A-Za-z0-9.\-]+)")
+# cloud region named in a provider host (AWS/GCP/Azure styles) or in a Bedrock client constructor (data-residency check AG-NET-002)
+REGION_IN_HOST = re.compile(r"(?:^|[.-])((?:us|eu|ap|sa|ca|me|af|il|mx)-(?:north|south|east|west|central|northeast|southeast|northwest|southwest)-\d|(?:us|europe|asia|australia|northamerica|southamerica)-[a-z]+\d{1,2}|(?:east|west|north|south|central|southcentral|northcentral)(?:us|europe|asia)\d?|uksouth|ukwest|swedencentral|francecentral|germanywestcentral|japaneast|japanwest|australiaeast|centralindia|southindia)(?:[.-]|$)", re.I)
+BEDROCK_REGION_RX = re.compile(r"""client\(\s*["']bedrock(?:-runtime|-agent-runtime|-agent)?["'][^)]*?region_name\s*=\s*["']([a-z0-9-]+)["']""", re.I)
 PROVIDER_HOSTS = re.compile(r"(api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|api\.mistral\.ai|api\.cohere\.(ai|com)|api\.groq\.com|openrouter\.ai|api\.together\.xyz|api-inference\.huggingface\.co|[\w-]+\.openai\.azure\.com|bedrock-runtime\.[\w-]+\.amazonaws\.com|api\.deepseek\.com|api\.x\.ai)", re.I)
 SECRET_RX = re.compile(r"(sk-[A-Za-z0-9_-]{16,}|sk-ant-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|xox[abpr]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})")
 TOOL_DECORATORS = {"tool", "function_tool", "kernel_function", "register_tool", "agent_tool"}
@@ -149,6 +152,8 @@ def scan_text_for_models(p, rp, ctx):
         for m in URL_RX.finditer(line):
             if PROVIDER_HOSTS.search(m.group(1)):
                 ctx["endpoints"].append((m.group(1).lower(), rp, i))
+        for m in BEDROCK_REGION_RX.finditer(line):
+            ctx.setdefault("regions", []).append((m.group(1).lower(), f"Bedrock client region_name={m.group(1)}", rp, i))
 
 
 def scan_mcp(p, rp, ctx):
@@ -240,6 +245,17 @@ def main():
         if not ok:
             ctx["findings"].append(finding("AG-NET-001", "MEDIUM", f"LLM endpoint '{host}' is not an approved destination (data leaves the approved boundary/region)", rp, ln, "P7", "LLM02",
                                            "Use an approved provider/endpoint; confirm data residency and contractual cover."))
+    approved_regions = {r.lower() for r in reg.get("approved_regions", [])}
+    if approved_regions:                      # data-residency check is opt-in: only when the registry lists approved regions
+        found = list(ctx.get("regions", []))
+        for host, rp, ln in ctx["endpoints"]:
+            rm = REGION_IN_HOST.search(host)
+            if rm:
+                found.append((rm.group(1).lower(), f"endpoint '{host}'", rp, ln))
+        for region, what, rp, ln in found:
+            if region not in approved_regions:
+                ctx["findings"].append(finding("AG-NET-002", "MEDIUM", f"{what} is in region '{region}', outside the approved regions ({', '.join(sorted(approved_regions))})", rp, ln, "P7", "LLM02",
+                                               "Run inference in an approved region (data residency), or ask the platform/security team to approve the region."))
     inv = {"frameworks": sorted(ctx["frameworks"]), "models": models, "endpoints": eps, "tools": ctx["inventory"]["tools"], "mcp_servers": ctx["inventory"]["mcp_servers"]}
     uniq, out = set(), []
     for f in ctx["findings"]:

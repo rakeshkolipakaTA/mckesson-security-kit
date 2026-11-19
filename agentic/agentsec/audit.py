@@ -49,6 +49,11 @@ def verify_chain(path, *, key=None):
     """Return (ok, records_checked, first_bad_index_or_None)."""
     key = key.encode() if isinstance(key, str) else key
     prev, n = _GENESIS, 0
+    if os.path.exists(path + ".anchor"):          # written by retention.purge_jsonl: the chain continues from the last purged record
+        try:
+            prev = json.load(open(path + ".anchor"))["prev"]
+        except (ValueError, KeyError):
+            return False, 0, 0
     with open(path) as f:
         for i, line in enumerate(f):
             try:

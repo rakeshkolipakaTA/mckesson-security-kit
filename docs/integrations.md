@@ -56,6 +56,16 @@ withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN'),
     SONAR_TOKEN: $(SONAR_TOKEN)
     SECSCAN_DASHBOARD_TOKEN: $(SECSCAN_DASHBOARD_TOKEN)
 ```
+### Tickets and alerts (optional)
+| Secret / setting | Value | Used by |
+|---|---|---|
+| `GITHUB_TOKEN` (`issues: write`) | provided by GitHub Actions automatically when the job has `permissions: issues: write` | `secscan tickets` (GitHub issues) |
+| `JIRA_URL`, `JIRA_USER`, `JIRA_TOKEN`, `JIRA_PROJECT` | your Jira Cloud/Server URL, a service account, its API token, the project key | `secscan tickets --target jira` |
+| `AZDO_ORG_URL`, `AZDO_PROJECT`, `AZDO_TOKEN` | `https://dev.azure.com/<org>`, project name, a PAT (Work Items read/write) | `secscan tickets --target azure` |
+| `DASHBOARD_ALERT_WEBHOOK` | a Slack / Teams incoming-webhook URL. Set it on the **dashboard server** (`platform.env`), not in CI | dashboard alerts |
+
+A scheduled CI job is the usual home for tickets, for example after the scan: `.security/secscan tickets --dashboard "$SEC_DASHBOARD_URL" --apply` with `SECSCAN_DASHBOARD_TOKEN` available. Run it as a dry run first. Details: [dashboard.md](dashboard.md).
+
 **Network**: the CI runner must reach the SonarQube and dashboard addresses. GitHub-hosted runners can only reach public addresses; a server on a private network needs self-hosted runners (or a public, IP-restricted endpoint). A scan never fails because the dashboard is unreachable: publishing problems are warnings.
 
 ## 4. Switch things on in the repo

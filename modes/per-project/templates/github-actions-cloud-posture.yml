@@ -1,0 +1,31 @@
+# .github/workflows/security-cloud-posture.yml - weekly AWS account posture check with Prowler (read-only OIDC role, no stored keys).
+# TEMPLATE, NOT RUN: try it in a sandbox account. Replace the role ARN and region. Needs an IAM role trusted for this repository
+# (token.actions.githubusercontent.com) with only the SecurityAudit + ViewOnlyAccess managed policies.
+name: security-cloud-posture
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'
+permissions:
+  contents: read
+  id-token: write          # needed to exchange the GitHub OIDC token for AWS credentials
+jobs:
+  prowler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502  # v4.0.2
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/security-audit-readonly     # EDIT
+          aws-region: us-east-1                                                        # EDIT
+      - name: Prowler (critical and high findings)
+        run: |
+          mkdir -p out && chmod 777 out
+          docker run --rm -v "$PWD/out:/out" -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
+            toniblyx/prowler:stable aws --severity critical high --output-formats json-ocsf html -o /out || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        if: always()
+        with:
+          name: prowler-report
+          path: out/
+          retention-days: 14

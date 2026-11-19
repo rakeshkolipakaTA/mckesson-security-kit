@@ -1,0 +1,110 @@
+<?xml version="1.0" ?>
+<testsuites disabled="0" errors="0" failures="4" tests="9" time="2.8672561569837853">
+	<testsuite disabled="0" errors="0" failures="4" name="schemathesis" skipped="0" tests="9" time="2.8672561569837853" hostname="a76a24268013">
+		<testcase name="GET /health" time="0.125748"/>
+		<testcase name="GET /items/{item_id}" time="2.005540">
+			<failure type="failure" message="1. Test Case ID: o8WcMo
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200, 422
+
+[500] Internal Server Error:
+
+    `Traceback (most recent call last):
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/errors.py&quot;, line 159, in __call__
+        await self.app(scope, receive, _send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/cors.py&quot;, line 78, in __call__
+        await self.app(scope, receive, send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, line 82, in __call__
+        raise exc from None
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, li // Output truncated...`
+
+Reproduce with: 
+
+    curl -X GET http://fa-st:8000/items/%3A"/>
+		</testcase>
+		<testcase name="POST /run" time="0.010691"/>
+		<testcase name="POST /load" time="0.024017">
+			<failure type="failure" message="1. Test Case ID: ZtwU2h
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200
+
+[500] Internal Server Error:
+
+    `Traceback (most recent call last):
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/errors.py&quot;, line 159, in __call__
+        await self.app(scope, receive, _send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/cors.py&quot;, line 78, in __call__
+        await self.app(scope, receive, send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, line 82, in __call__
+        raise exc from None
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, li // Output truncated...`
+
+Reproduce with: 
+
+    curl -X POST http://fa-st:8000/load"/>
+		</testcase>
+		<testcase name="POST /yaml" time="0.006454"/>
+		<testcase name="GET /fetch" time="0.145727">
+			<failure type="failure" message="1. Test Case ID: CTjFBi
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200, 422
+
+[500] Internal Server Error:
+
+    `Traceback (most recent call last):
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/errors.py&quot;, line 159, in __call__
+        await self.app(scope, receive, _send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/cors.py&quot;, line 78, in __call__
+        await self.app(scope, receive, send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, line 82, in __call__
+        raise exc from None
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, li // Output truncated...`
+
+Reproduce with: 
+
+    curl -X GET 'http://fa-st:8000/fetch?url='"/>
+		</testcase>
+		<testcase name="GET /file" time="0.108291">
+			<failure type="failure" message="1. Test Case ID: 291YRi
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200, 422
+
+[500] Internal Server Error:
+
+    `Traceback (most recent call last):
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/errors.py&quot;, line 159, in __call__
+        await self.app(scope, receive, _send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/middleware/cors.py&quot;, line 78, in __call__
+        await self.app(scope, receive, send)
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, line 82, in __call__
+        raise exc from None
+      File &quot;/usr/local/lib/python3.9/site-packages/starlette/exceptions.py&quot;, li // Output truncated...`
+
+Reproduce with: 
+
+    curl -X GET 'http://fa-st:8000/file?name='"/>
+		</testcase>
+		<testcase name="GET /greet" time="0.171283"/>
+		<testcase name="GET /hash" time="0.269505"/>
+	</testsuite>
+</testsuites>
