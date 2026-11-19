@@ -29,13 +29,13 @@ The result is one HTML report, a summary on the pipeline page, markers on the ri
 **Linux / macOS**
 ```bash
 python3 -m venv ~/.warden-venv
-~/.warden-venv/bin/pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.0"
+~/.warden-venv/bin/pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.1"
 mkdir -p ~/.local/bin && ln -sf ~/.warden-venv/bin/warden ~/.local/bin/warden
 ```
 **Windows (PowerShell)**
 ```powershell
 py -m venv $env:USERPROFILE\.warden-venv
-& "$env:USERPROFILE\.warden-venv\Scripts\pip.exe" install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.0"
+& "$env:USERPROFILE\.warden-venv\Scripts\pip.exe" install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.1"
 [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.warden-venv\Scripts", "User")
 ```
 Open a new terminal and check `warden --version`. (Your platform team may give you an internal package index instead of the git URL; the rest is the same.)
