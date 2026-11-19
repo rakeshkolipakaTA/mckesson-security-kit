@@ -3,7 +3,7 @@
 # Checks (chosen automatically for your stack; `.security/warden config show` lists them):
 #   Code (SAST)    : Semgrep (OWASP Top 10, injection, XSS, JWT, framework rules; AI-agent rules), Bandit (Python), ESLint security (Node)
 #   Libraries (SCA): Trivy, pip-audit (Python), npm audit (Node), licences, SBOM; Dependency-Check for Java on the strict preset
-#   Also           : secrets (files + git history), Dockerfile / IaC / Kubernetes, GitHub workflows, model files
+#   Also           : secrets in files (git history is opt-in: SEC_GITLEAKS_HISTORY=on), Dockerfile / IaC / Kubernetes, GitHub workflows, model files
 #   Optional       : SonarQube (needs a server), CodeQL (see .security/ci/security-codeql.github.yml)
 # No server needed. Results appear in GitHub itself: the run page (summary), the "Files changed" tab (markers on the risky lines) and ONE
 # comment on the pull request that is updated on every push. If you later set SEC_DASHBOARD_URL, each scan is also sent to the dashboard.
@@ -28,7 +28,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
-          fetch-depth: 0          # full history, so the secret scan can also see old commits (a shallow checkout skips that check; set 1 on a huge repo)
       - name: List the checks that will run
         run: .security/warden config show
       - name: Security scan
@@ -37,6 +36,7 @@ jobs:
           # Only needed if you turned on SonarQube (SEC_SONAR=1). Set in repo Settings > Secrets and variables.
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          WARDEN_GIT_TOKEN: ${{ github.token }}   # used ONLY when you turn on git-history scanning (SEC_GITLEAKS_HISTORY=on): fetches the last SEC_HISTORY_COMMITS commits, no full clone
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
       - name: Show results in GitHub (run summary, file markers, pull request comment)
         if: always()

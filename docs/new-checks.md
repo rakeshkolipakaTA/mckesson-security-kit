@@ -18,7 +18,7 @@ All of them follow the same rules as the older tools: they are switched with `SE
 | [Remediation deadlines](#remediation-deadlines-sla) | a dated baseline exists | Which accepted findings are past their deadline? | `warden baseline` |
 
 ## Secrets in git history
-A secret deleted in a later commit is still in the history and still valid until rotated. `gitleaks git` scans the newest 3000 commits (`SEC_HISTORY_COMMITS` to change). Results are grouped per file and rule ("2 commits, first abc1234 on 2024-01-02"); secrets still present in the working tree are reported once, by the normal gitleaks scan. **Fix = rotate the credential**; rewriting history is optional.
+A secret deleted in a later commit is still in the history and still valid until rotated. This check is **optional** (`SEC_GITLEAKS_HISTORY=on`; on by default only for the strict preset). `gitleaks git` scans the newest 3000 commits (`SEC_HISTORY_COMMITS` to change); in a shallow CI checkout `SEC_HISTORY_FETCH` fetches just those commits. Results are grouped per file and rule ("2 commits, first abc1234 on 2024-01-02"); secrets still present in the working tree are reported once, by the normal gitleaks scan. **Fix = rotate the credential**; rewriting history is optional.
 Limits: a shallow clone (CI default) hides older commits: the report says so under *Reduced coverage*; use `actions/checkout` with `fetch-depth: 0`. A git worktree or an exported folder has no history to scan.
 
 ## SBOM and licences

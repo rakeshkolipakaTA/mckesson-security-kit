@@ -65,11 +65,12 @@
     "_note": "A project cannot turn these off in config.env. To waive one, add a time-boxed entry {tool, reason, approved_by, expires} to .security/exceptions.json."
   },
   "presets": {
-    "_note": "Defaults a team gets by choosing SEC_PRESET. Any explicit SEC_* setting overrides the preset. Tool values: auto (run when it fits) | on | off.",
+    "_note": "Defaults a team gets by choosing SEC_PRESET. Any explicit SEC_* setting overrides the preset. Tool values: auto (run when it fits) | on | off. Git-history secret scanning is opt-in on starter and standard (SEC_GITLEAKS_HISTORY=on, SEC_HISTORY_COMMITS=N) and on for strict.",
     "starter": {
       "enforce": 0,
       "gate": "pr",
       "tools": {
+        "history": "off",
         "sonar": "off",
         "depcheck": "off"
       }
@@ -78,6 +79,7 @@
       "enforce": 1,
       "gate": "pr",
       "tools": {
+        "history": "off",
         "sonar": "off",
         "depcheck": "off"
       }

@@ -74,7 +74,7 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 
 | Priority | Area | Check | Status | What exists / what is missing |
 |---|---|---|---|---|
-| High | Secrets | Scan git history, not just the current files | Done | SEC_GITLEAKS_HISTORY: verified, shallow clones flagged |
+| High | Secrets | Scan git history, not just the current files | Done | SEC_GITLEAKS_HISTORY (opt-in; on for strict), SEC_HISTORY_COMMITS limit, SEC_HISTORY_FETCH for shallow CI checkouts: verified |
 | High | Supply chain | SBOM generation + licence compliance | Done | SEC_SBOM and Trivy licences: verified; licence data only where manifests carry it |
 | High | Supply chain | Automated dependency-update pull requests | Done | warden init generates the config; GitHub's service not run here |
 | High | Process | Enforce remediation SLAs and create tickets | Done | Gate + dashboard verified; tickets and alerts tested against mock servers |
@@ -112,10 +112,10 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting | 22 |
 | scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers | 83 |
 | scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script | 83 |
-| scripts/test-newtools.sh | SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs | 29 |
+| scripts/test-newtools.sh | SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs | 36 |
 | scripts/e2e-agent.sh | Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain | 12 |
 | scripts/test_gate.py | Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit) | 28 |
-| scripts/test_toolplan.py | Presets, per-tool switches, required-tool lock, waivers (unit) | 16 |
+| scripts/test_toolplan.py | Presets, per-tool switches, required-tool lock, waivers, opt-in git history (unit) | 17 |
 | scripts/test_dashboard.py | Dashboard auth, ingest, hostile input, views, SLA, alerts, publisher (unit) | 20 |
 | scripts/test_tickets.py | Ticket creation for Jira / GitHub / Azure Boards against local stand-ins (unit) | 11 |
 | scripts/test_platform_templates.py | Dependabot / Renovate, CI templates pinned and least-privilege, GitHub-native reporting wiring, Falco rules, process kit, SLA text (unit) | 11 |
@@ -125,4 +125,4 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
 | agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
 | agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
-| **Total** |  | **442** |
+| **Total** |  | **450** |

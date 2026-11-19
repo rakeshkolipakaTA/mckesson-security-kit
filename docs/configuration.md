@@ -35,7 +35,7 @@ The preset definitions live in the central policy (`configs/policies/policy.json
 | Dependency-Check | `SEC_DEPCHECK` | off (`strict`: auto) | Java project | Yes |
 | OWASP ZAP | `SEC_ZAP` | auto | `SEC_ZAP_URL` is set | Yes |
 | AI red-team probes | `SEC_REDTEAM` | auto | `SEC_REDTEAM_URL` is set | Yes |
-| Secrets in git history | `SEC_GITLEAKS_HISTORY` | auto | the folder is a git checkout | Yes |
+| Secrets in git history | `SEC_GITLEAKS_HISTORY` | **off** on starter and standard, on for strict | the folder is a git checkout | Yes. Also `SEC_HISTORY_COMMITS=N` (how many newest commits, default 3000) and `SEC_HISTORY_FETCH` (see below) |
 | SBOM (CycloneDX) | `SEC_SBOM` | auto | always | Yes |
 | GitHub Actions security (zizmor) | `SEC_WORKFLOW_SCAN` | auto | `.github/workflows` exists | Yes |
 | Kubernetes posture (kubescape) | `SEC_K8S_POSTURE` | auto | Kubernetes manifests exist | Yes |
@@ -70,3 +70,13 @@ Severity thresholds, the required-tool list, scanner versions and the approved-m
 |---|---|
 | `warden config show` | Prints preset, enforce/gate, detected stacks and, for each tool, run/skip and the reason |
 | `warden config set KEY VALUE` | Edits one setting in `.security/config.env` (rejects unsafe values) |
+
+
+## Git history scanning (optional)
+Scanning past commits finds secrets that were deleted later but are still valid. It is **off by default** on `starter` and `standard` (it needs more history and time) and on for `strict`. Turn it on in `.security/config.env`:
+```ini
+SEC_GITLEAKS_HISTORY=on     # scan past commits too
+SEC_HISTORY_COMMITS=500     # only the newest 500 commits (default 3000); smaller is faster
+SEC_HISTORY_FETCH=auto      # shallow CI checkout: fetch just that many commits (auto = when the workflow passes WARDEN_GIT_TOKEN, which the generated GitHub workflow does)
+```
+No `fetch-depth: 0` is needed: the scan fetches only the last `SEC_HISTORY_COMMITS` commits. If it cannot (no access to origin), it scans what is available and the report says so. When the limit cuts off older commits, the report notes that too.

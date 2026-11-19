@@ -168,10 +168,10 @@ SUITES = [
  ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting", 22),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
  ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script", 83),
- ("scripts/test-newtools.sh", "SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs", 29),
+ ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs", 36),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
  ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),
- ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers (unit)", 16),
+ ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers, opt-in git history (unit)", 17),
  ("scripts/test_dashboard.py", "Dashboard auth, ingest, hostile input, views, SLA, alerts, publisher (unit)", 20),
  ("scripts/test_tickets.py", "Ticket creation for Jira / GitHub / Azure Boards against local stand-ins (unit)", 11),
  ("scripts/test_platform_templates.py", "Dependabot / Renovate, CI templates pinned and least-privilege, GitHub-native reporting wiring, Falco rules, process kit, SLA text (unit)", 11),
@@ -341,7 +341,7 @@ PRESENTATION = [(r[0], r[1]) + _UPD.get((r[0], r[1]), r[2:]) for r in PRESENTATI
 
 # (priority, area, missing check, why it matters, suggested tool, effort)
 ROADMAP = [
- (1, "Secrets", "Scan git history, not just the current files", "A secret deleted in a later commit is still in the history and still valid", "gitleaks git mode", "Small", "Done", "SEC_GITLEAKS_HISTORY: verified, shallow clones flagged"),
+ (1, "Secrets", "Scan git history, not just the current files", "A secret deleted in a later commit is still in the history and still valid", "gitleaks git mode", "Small", "Done", "SEC_GITLEAKS_HISTORY (opt-in; on for strict), SEC_HISTORY_COMMITS limit, SEC_HISTORY_FETCH for shallow CI checkouts: verified"),
  (1, "Supply chain", "SBOM generation + licence compliance", "Know exactly what ships; block disallowed licences; answer 'are we affected by CVE-X?' in minutes", "Trivy (CycloneDX) + licence policy", "Small", "Done", "SEC_SBOM and Trivy licences: verified; licence data only where manifests carry it"),
  (1, "Supply chain", "Automated dependency-update pull requests", "Turns the report into fixes (presentation: Snyk-style remediation)", "Dependabot or Renovate", "Small", "Done", "warden init generates the config; GitHub's service not run here"),
  (1, "Process", "Enforce remediation SLAs and create tickets", "Findings only get fixed when they have an owner and a deadline", "Dated baseline, dashboard SLA tracking, ticket creation", "Medium", "Done", "Gate + dashboard verified; tickets and alerts tested against mock servers"),

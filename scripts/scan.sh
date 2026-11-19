@@ -69,7 +69,7 @@ REPO="$(cd "$REPO" && pwd)"; NAME="$(basename "$REPO")"
 SEC_DIR="${SEC_DIR_ARG:-$REPO/.security}"; [ -d "$SEC_DIR" ] && SEC_DIR="$(cd "$SEC_DIR" && pwd)"
 
 # ---- config.env: parsed, never sourced (a pull request must not be able to run code on the scanner) ----
-CONFIG_KEYS=" SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
+CONFIG_KEYS=" SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
 load_config() {
   local line k v
   while IFS= read -r line || [ -n "$line" ]; do
@@ -98,7 +98,7 @@ POLICY="$HERE/configs/policies/policy.json"
 PRESET_OUT="$(python3 -I "$HERE/scripts/toolplan.py" preset --policy "$POLICY" --preset "$SEC_PRESET")" || exit 2
 read -r PRESET_ENFORCE PRESET_GATE <<< "$PRESET_OUT"
 : "${SEC_ENFORCE:=$PRESET_ENFORCE}" "${SEC_GATE:=$PRESET_GATE}"
-: "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}" "${SEC_SEMGREP_PACKS:=auto}"
+: "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}" "${SEC_SEMGREP_PACKS:=auto}" "${SEC_HISTORY_FETCH:=auto}"
 : "${SEC_REDTEAM_URL:=}" "${SEC_REDTEAM_NETWORK:=}" "${SEC_REDTEAM_CONTRACT:=}"
 case "$SEC_GATE" in pr|release) ;; *) echo "SEC_GATE must be pr or release" >&2; exit 2;; esac
 ENFORCE=""; [ "$SEC_ENFORCE" = 1 ] && ENFORCE="--enforce"
@@ -220,8 +220,25 @@ run_gitleaks_history() {
   local max total note=""
   max="${SEC_HISTORY_COMMITS:-$(python3 -I -c 'import json,sys;print(json.load(open(sys.argv[1])).get("history_scan",{}).get("max_commits",3000))' "$POLICY")}"
   total="$(git -C "$REPO" rev-list --count HEAD 2>/dev/null || echo 0)"
+  [[ "$max" =~ ^[0-9]+$ ]] && [ "$max" -ge 1 ] || { echo "NOTE: SEC_HISTORY_COMMITS must be a positive number (got '$max'); using 3000" >&2; max=3000; }
+  if [ "$(git -C "$REPO" rev-parse --is-shallow-repository 2>/dev/null)" = true ]; then
+    # A shallow checkout (CI default) has only the newest commit. SEC_HISTORY_FETCH=on (or auto with WARDEN_GIT_TOKEN set, as the generated GitHub workflow does)
+    # fetches just the newest $max commits, so no full clone is needed.
+    local want=0; case "$SEC_HISTORY_FETCH" in on) want=1;; auto) [ -n "${WARDEN_GIT_TOKEN:-}" ] && want=1;; esac
+    if [ "$want" = 1 ]; then
+      local hdr=() url base; url="$(git -C "$REPO" remote get-url origin 2>/dev/null || true)"
+      if [ -n "${WARDEN_GIT_TOKEN:-}" ] && [[ "$url" =~ ^(https?://[^/]+)/ ]]; then
+        base="${BASH_REMATCH[1]}"; hdr=(-c "http.$base/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$WARDEN_GIT_TOKEN" | base64 | tr -d '\n')")
+      fi
+      log "git history: shallow checkout, fetching the newest $max commits"
+      local to=""; command -v timeout >/dev/null 2>&1 && to="timeout 240"
+      $to git -C "$REPO" "${hdr[@]}" fetch --quiet --depth="$max" origin "$(git -C "$REPO" rev-parse HEAD)" >/dev/null 2>&1 \
+        || echo "NOTE: could not fetch more history (no access to origin?); scanning what is available" >&2
+    fi
+  fi
+  total="$(git -C "$REPO" rev-list --count HEAD 2>/dev/null || echo 0)"
   log "gitleaks: secrets in git history ($total commits, newest $max scanned at most)"
-  [ "$(git -C "$REPO" rev-parse --is-shallow-repository 2>/dev/null)" = true ] && note="git history: shallow clone, so older commits were not scanned (check out with full history, e.g. actions/checkout fetch-depth: 0)"
+  [ "$(git -C "$REPO" rev-parse --is-shallow-repository 2>/dev/null)" = true ] && [ "$total" -lt "$max" ] && note="git history: shallow clone, so only $total commit(s) were available and older ones were not scanned (set SEC_HISTORY_FETCH=on to fetch up to $max, or check out with fetch-depth: 0)"
   [ "$total" -gt "$max" ] && note="${note:+$note; }git history: only the newest $max of $total commits were scanned (raise SEC_HISTORY_COMMITS)"
   docker run --rm --user "$UIDGID" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src -v "$REPO:/src:ro" -v "$GITLEAKS_CFG:/cfg/gitleaks.toml:ro" \
     -v "$HERE/configs/gitleaks:/cfg-default:ro" -v "$OUT/raw:/out" "$GITLEAKS_IMAGE" git /src --config /cfg/gitleaks.toml --log-opts="--max-count=$max" \

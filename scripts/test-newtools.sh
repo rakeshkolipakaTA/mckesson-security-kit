@@ -38,7 +38,7 @@ spec:
           securityContext: {privileged: true}
 YML
 ( cd "$R" && git init -q -b main . && $G add -A && $G commit -q -m one && printf 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7ABCDEFG\n' > old-creds.env && $G add -A && $G commit -q -m two && git rm -q old-creds.env && $G commit -q -m three )
-scripts/scan.sh "$R" --partial --skip semgrep,bandit,pip-audit --out "$T/o1" >"$T/o1.log" 2>&1
+SEC_GITLEAKS_HISTORY=on scripts/scan.sh "$R" --partial --skip semgrep,bandit,pip-audit --out "$T/o1" >"$T/o1.log" 2>&1
 S="$T/o1/summary.json"; F="$T/o1/findings.json"
 pyj "$S" 'all(d["tool_status"].get(t)=="ok" for t in ("gitleaks-history","sbom","workflow-scan","k8s-posture"))'; check "new tools ran and report ok" 0 $?
 pyj "$F" 'any(f["tool"]=="gitleaks-history" and f["path"]=="old-creds.env" for f in d)'; check "a secret deleted from the tree is still found in git history" 0 $?
@@ -52,8 +52,21 @@ grep -q 'Compliance view' "$T/o1/summary.md"; check "compliance view in the mark
 
 echo "== shallow clone: history is truncated and the report says so"
 git clone -q --depth 1 "file://$R" "$T/shallow" 2>/dev/null
-scripts/scan.sh "$T/shallow" --partial --skip semgrep,bandit,pip-audit,trivy,gitleaks,sbom,workflow-scan,k8s --out "$T/o2" >"$T/o2.log" 2>&1
+SEC_GITLEAKS_HISTORY=on SEC_HISTORY_FETCH=off scripts/scan.sh "$T/shallow" --partial --skip semgrep,bandit,pip-audit,trivy,gitleaks,sbom,workflow-scan,k8s --out "$T/o2" >"$T/o2.log" 2>&1
 pyj "$T/o2/summary.json" 'any("shallow clone" in m for m in d["degraded_manifests"])'; check "shallow clone is flagged as reduced coverage" 0 $?
+
+echo "== git history is optional, limited by SEC_HISTORY_COMMITS, and a shallow CI checkout can fetch just what it needs"
+scripts/scan.sh "$R" --partial --skip semgrep,bandit,pip-audit,trivy,gitleaks,sbom,workflow-scan,k8s --out "$T/h0" >"$T/h0.log" 2>&1
+pyj "$T/h0/summary.json" '"gitleaks-history" not in d["tool_status"]'; check "history scan does not run unless switched on (default preset)" 0 $?
+SEC_GITLEAKS_HISTORY=on SEC_HISTORY_COMMITS=1 scripts/scan.sh "$R" --partial --skip semgrep,bandit,pip-audit,trivy,gitleaks,sbom,workflow-scan,k8s --out "$T/h1" >"$T/h1.log" 2>&1
+pyj "$T/h1/findings.json" 'not any(f["tool"]=="gitleaks-history" and f["path"]=="old-creds.env" for f in d)'; check "SEC_HISTORY_COMMITS=1 scans only the newest commit (older secret not seen)" 0 $?
+pyj "$T/h1/summary.json" 'any("only the newest 1 of" in m for m in d["degraded_manifests"])'; check "the limit is reported as reduced coverage" 0 $?
+rm -rf "$T/shallow2"; git clone -q --depth 1 "file://$R" "$T/shallow2" 2>/dev/null
+SEC_GITLEAKS_HISTORY=on SEC_HISTORY_FETCH=on SEC_HISTORY_COMMITS=50 scripts/scan.sh "$T/shallow2" --partial --skip semgrep,bandit,pip-audit,trivy,gitleaks,sbom,workflow-scan,k8s --out "$T/h2" >"$T/h2.log" 2>&1
+pyj "$T/h2/findings.json" 'any(f["tool"]=="gitleaks-history" and f["path"]=="old-creds.env" for f in d)'; check "SEC_HISTORY_FETCH=on deepens a shallow checkout and finds the old secret" 0 $?
+pyj "$T/h2/summary.json" 'not any("shallow" in m for m in d["degraded_manifests"])'; check "no shallow warning once the history was fetched" 0 $?
+SEC_GITLEAKS_HISTORY=on SEC_HISTORY_COMMITS=abc scripts/scan.sh "$R" --partial --skip semgrep,bandit,pip-audit,trivy,gitleaks,sbom,workflow-scan,k8s --out "$T/h3" >"$T/h3.log" 2>&1; check "a non-numeric SEC_HISTORY_COMMITS does not break the scan" 0 $?
+grep -q "must be a positive number" "$T/h3.log"; check "and says what it did" 0 $?
 
 echo "== dated baseline and SLA"
 scripts/scan.sh "$R" --partial --skip semgrep,bandit,pip-audit --write-baseline --out "$T/o3" >/dev/null 2>&1

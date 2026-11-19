@@ -103,8 +103,17 @@ def test_only_explicit_off_is_marked_explicit():
 def test_new_tools_follow_their_facts():
     base = runs(tp.plan(A()))
     assert "sbom" in base and not base & {"gitleaks-history", "workflow-scan", "k8s-posture", "api-fuzz", "exposure", "repo-posture"}
-    r = runs(tp.plan(A(facts=["git", "workflows", "k8s", "ghrepo"], api_spec="http://x/openapi.json", exposure_targets="https://qa.example")))
+    r = runs(tp.plan(A(facts=["git", "workflows", "k8s", "ghrepo"], modes="history=on", api_spec="http://x/openapi.json", exposure_targets="https://qa.example")))
     assert {"gitleaks-history", "workflow-scan", "k8s-posture", "repo-posture", "api-fuzz", "exposure"} <= r
+
+
+def test_git_history_scanning_is_opt_in_on_starter_and_standard_and_on_for_strict():
+    for preset in ("starter", "standard"):
+        assert "gitleaks-history" not in runs(tp.plan(A(facts=["git"], preset=preset))), preset
+        assert "gitleaks-history" in runs(tp.plan(A(facts=["git"], preset=preset, modes="history=on"))), preset
+        assert "gitleaks-history" in runs(tp.plan(A(facts=["git"], preset=preset, modes="gitleaks-history=on")))
+    assert "gitleaks-history" in runs(tp.plan(A(facts=["git"], preset="strict")))
+    assert "gitleaks-history" not in runs(tp.plan(A(facts=[], preset="strict"))), "no git checkout: nothing to scan"
 
 
 def test_new_tools_can_be_switched_and_on_without_target_is_reported():

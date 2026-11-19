@@ -24,7 +24,8 @@ A check that could not run is shown as **"Did not complete"**, never as clean.
 ## What runs with nothing but GitHub
 | Check | Runs by default? | Notes |
 |---|---|---|
-| Secrets in files and git history (gitleaks) | Yes | The generated workflow checks out the full history (`fetch-depth: 0`) so old commits are scanned too |
+| Secrets in files (gitleaks) | Yes | |
+| Secrets in **git history** | Optional, off by default | `SEC_GITLEAKS_HISTORY=on` and `SEC_HISTORY_COMMITS=500` in `config.env`; the workflow fetches just those commits (no full clone needed) |
 | Code analysis (SAST): Semgrep with OWASP Top 10, CWE Top 25, injection, XSS, JWT, framework and Dockerfile rule packs; Bandit (Python); ESLint security (Node) | Yes | Extra packs: `SEC_SEMGREP_PACKS=auto\|none\|p/a,p/b` in `config.env`. Deeper data-flow analysis: optional CodeQL, see below |
 | Dependencies with known vulnerabilities (Trivy, pip-audit, npm audit), licences, SBOM | Yes | |
 | Dockerfile, Terraform, CloudFormation, Kubernetes manifests (Trivy, kubescape) | Yes, when such files exist | |

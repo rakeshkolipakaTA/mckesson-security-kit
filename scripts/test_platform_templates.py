@@ -91,7 +91,8 @@ def test_pr_workflow_shows_results_in_github_without_a_server():
     assert "vars.WARDEN_CODE_SCANNING == 'true'" in t and re.search(r"upload-sarif@[0-9a-f]{40}", t), "the Security-tab upload is opt-in and pinned"
     assert "# security-events: write" in t, "write access to the Security tab stays commented out until a team opts in"
     assert "sbom.cdx.json" in t
-    assert re.search(r"fetch-depth:\s*0", t), "full history is needed for the git-history secret scan"
+    assert "WARDEN_GIT_TOKEN: ${{ github.token }}" in t, "lets git-history scanning fetch just the last N commits without a full clone"
+    assert "fetch-depth: 0" not in t, "history scanning is opt-in; the default checkout stays fast"
     assert ".security/warden config show" in t, "the run log should list which checks run"
 
 def test_release_templates_pin_actions_to_commit_shas_and_declare_least_privilege():
