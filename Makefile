@@ -1,10 +1,12 @@
-.PHONY: test-newtools test-agentic-docker platform-up test-package e2e-agent test-onboarding e2e-fastapi sonar-up sonar-down selftest dashboard build-scanner
+.PHONY: test test-newtools test-agentic-docker platform-up test-package e2e-agent test-onboarding e2e-fastapi sonar-up sonar-down selftest dashboard build-scanner
 platform-up:    ## SonarQube + dashboard on this server (see docs/dashboard.md); HOST=<address> to set the URLs it prints
 	scripts/platform-up.sh $(if $(HOST),--host $(HOST),)
 sonar-up:        ## start central SonarQube on http://localhost:9000
 	cd docker && docker compose --env-file ../versions.env up -d
 sonar-down:
 	cd docker && docker compose --env-file ../versions.env down
+test: selftest test-newtools test-onboarding test-package e2e-agent  ## everything before a release (~25 min)
+
 selftest:        ## prove the gate logic (~2 min, needs Docker + internet for the first Trivy DB download)
 	scripts/selftest.sh
 dashboard:

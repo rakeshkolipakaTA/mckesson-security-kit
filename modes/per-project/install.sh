@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Add the McKesson security kit to ONE repository (per-project mode).
-#   warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor] [--source SRC]
+#   warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor] [--pin] [--source SRC]
 # Default (installed with pip): THIN - commits only config + CI + a version pin (warden.lock); the engine is installed from the pin.
 # --vendor (default when run from a framework checkout): copies the whole engine into .security/kit (works offline).
 # Safe to re-run (= upgrade): refreshes generated files, never overwrites your config, exceptions or baseline.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T="$HERE/modes/per-project/templates"
-REPO="." CI=auto PRESET="" VENDOR="" SOURCE="${WARDEN_SOURCE:-}"
+REPO="." CI=auto PRESET="" VENDOR="" PIN="" SOURCE="${WARDEN_SOURCE:-}"
 while [ $# -gt 0 ]; do
   case "$1" in --ci) CI="${2:?--ci needs github|jenkins|azure|all|none}"; shift 2;; --preset) PRESET="${2:?--preset needs starter|standard|strict}"; shift 2;;
-    --vendor) VENDOR=1; shift;; --thin) VENDOR=0; shift;; --source) SOURCE="${2:?--source needs a pip source}"; shift 2;; -h|--help) sed -n '2,7p' "$0"; exit 0;; -*) echo "unknown option $1" >&2; exit 2;; *) REPO="$1"; shift;; esac
+    --vendor) VENDOR=1; shift;; --thin) VENDOR=0; shift;; --pin) PIN=1; shift;; --source) SOURCE="${2:?--source needs a pip source}"; shift 2;; -h|--help) sed -n '2,7p' "$0"; exit 0;; -*) echo "unknown option $1" >&2; exit 2;; *) REPO="$1"; shift;; esac
 done
 [ -d "${REPO:-}" ] || { echo "usage: warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset ...] [--vendor]" >&2; exit 2; }
 REPO="$(cd "$REPO" && pwd)"; S="$REPO/.security"; KIT="$S/kit"
@@ -48,7 +48,15 @@ else
   rm -rf "$KIT"
   [ -n "$SOURCE" ] || SOURCE="warden-kit==$VERSION_NOW"
   cp "$T/warden-shim.sh" "$S/warden"; chmod +x "$S/warden"
-  printf '# written by warden init - commit this file. CI and teammates install exactly this version.\nversion=%s\nsource=%s\nmode=thin\n' "$VERSION_NOW" "$SOURCE" > "$S/warden.lock"
+  # channel: an existing repo keeps its choice. New repos follow the newest release of the major line (auto) when installed from a git tag or branch,
+  # and are pinned when the source is a plain version or a commit. --pin forces an exact version.
+  CHANNEL=""; [ -f "$S/warden.lock" ] && CHANNEL="$(sed -n 's/^channel=//p' "$S/warden.lock" | head -1 | tr -d '\r')"
+  if [ -f "$S/warden.lock" ] && [ "$CHANNEL" = auto ] && [ -z "$PIN" ]; then SOURCE="$(sed -n 's/^source=//p' "$S/warden.lock" | head -1 | tr -d '\r')"
+  elif [ -n "$PIN" ] || [ "$CHANNEL" = pinned ]; then CHANNEL=pinned
+  elif [[ "$SOURCE" =~ ^git\+.*@v([0-9]+)\.[0-9]+\.[0-9]+$ ]]; then CHANNEL=auto; SOURCE="${SOURCE%@*}@v${BASH_REMATCH[1]}"
+  elif [[ "$SOURCE" =~ ^git\+.*@[A-Za-z][A-Za-z0-9._/-]*$ ]]; then CHANNEL=auto
+  else CHANNEL=pinned; fi
+  printf '# written by warden init - commit this file.\n# channel=auto: follows the newest release of the pinned major line automatically. channel=pinned: exactly this version (warden pin).\nversion=%s\nsource=%s\nchannel=%s\nmode=thin\n' "$VERSION_NOW" "$SOURCE" "$CHANNEL" > "$S/warden.lock"
 fi
 
 # 2) your files (created once, never overwritten)
@@ -106,7 +114,7 @@ if [ ! -e "$REPO/.vscode/settings.json" ]; then mkdir -p "$REPO/.vscode"; cp "$T
 echo
 echo "Security kit $([ $UPGRADE = 1 ] && echo upgraded || echo installed) in $S"
 echo "  detected stack : $PROFILES"
-echo "  engine         : $([ "$VENDOR" = 1 ] && echo "vendored in .security/kit (works offline)" || echo "thin, pinned to warden $VERSION_NOW in .security/warden.lock")"
+echo "  engine         : $([ "$VENDOR" = 1 ] && echo "vendored in .security/kit (works offline)" || { [ "${CHANNEL:-}" = auto ] && echo "thin, follows the newest release automatically (channel=auto in .security/warden.lock)" || echo "thin, pinned to warden $VERSION_NOW in .security/warden.lock"; })"
 echo "  preset         : $(grep -m1 '^SEC_PRESET=' "$S/config.env" | cut -d= -f2) (set in .security/config.env; 'starter' = report-only, scans never fail your build yet)"
 [ -n "$INSTALLED" ] && echo "  CI added       : $INSTALLED (GitHub Actions, report-only)"
 [ -n "$EXTRA" ] && echo "  also added     :$EXTRA (only when missing; they are yours now)"

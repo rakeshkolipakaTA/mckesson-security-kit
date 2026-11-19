@@ -47,7 +47,7 @@ warden init                      # add --preset standard to block PRs from day o
 git add .security .github && git commit -m "Add security scanning (report-only)" && git push
 ```
 `init` detects your stack, adds `.security/` (config, CI templates, a version pin), and for GitHub adds `.github/workflows/security-scan.yml`.
-It never overwrites your own files, and re-running it (or `warden upgrade`) refreshes the generated ones. No engine files are copied into your repo; only the pin (`warden.lock`). For offline / air-gapped use `warden init --vendor` copies the engine into `.security/kit`.
+By default the repo then **follows the newest Warden release automatically** (new checks arrive with no change in your repo; `warden pin` freezes a version): [updates-and-versions.md](updates-and-versions.md). It never overwrites your own files, and re-running it (or `warden upgrade`) refreshes the generated ones. No engine files are copied into your repo; only the pin (`warden.lock`). For offline / air-gapped use `warden init --vendor` copies the engine into `.security/kit`.
 
 ## Step 2: check your machine
 ```bash

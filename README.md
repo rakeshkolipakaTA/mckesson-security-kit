@@ -45,10 +45,10 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | AI agent: red-team probes | Does a running agent resist real attack attempts? | 21 | 19 deterministic probes; DeepTeam (7 frameworks) and promptfoo templates |
 | AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 16 | agentsec (16 modules) |
 | Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 13 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
-| Developer workflow | Catches problems on the developer's machine before CI. | 3 | pre-push hook, pre-commit, PR template, IDE recommendations |
+| Developer workflow | Catches problems on the developer's machine before CI. | 4 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **122** | 21 scanner tools plus the library and gate |
+| **Total** |  | **123** | 21 scanner tools plus the library and gate |
 
 **Coverage of the Agentic Security presentation:** 97 items checked: 47 covered, 47 partial, 3 not covered. Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). Roadmap: 16 done, 6 partly, 1 documented only, 7 planned (penetration-test gaps).
 <!-- coverage:end -->

@@ -100,6 +100,7 @@ INVENTORY = [
  ("Gate, policy & reporting", "Reports: HTML, markdown, JSON, SARIF", "One report per scan; SARIF for code-scanning UIs", "all", "every scan", V, ""),
  ("Gate, policy & reporting", "Central dashboard", "Portfolio and per-repo view across all tools; stale and tool-problem detection", "all", "continuous", V, "One shared login; no alerting"),
  # ---- Developer workflow
+ ("Developer workflow", "Auto-update channel, pin and release script", "New checks reach every repo on the next run (follows the moving v1 tag); warden pin freezes a version; release.sh cuts tags", "all", "every run", V, "Tested with a local git source (new release, offline fallback, pin, re-init). Not yet run against the real GitHub tag from CI"),
  ("Developer workflow", "Pre-push hook (warden quick)", "Secrets + code analysis before every git push", "all", "developer machine", V, "warden hook install"),
  ("Developer workflow", "pre-commit config, PR template, CODEOWNERS snippet", "Local checks and review rules for .security/", "all", "developer machine / PR", V, "Templates; CODEOWNERS team handle is a placeholder"),
 ]
@@ -166,7 +167,7 @@ INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the o
 SUITES = [
  ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting", 22),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
- ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report", 50),
+ ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script", 83),
  ("scripts/test-newtools.sh", "SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs", 29),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
  ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),

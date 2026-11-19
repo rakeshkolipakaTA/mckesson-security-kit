@@ -59,6 +59,9 @@ When a team has a Warden dashboard server ([dashboard.md](dashboard.md)), add tw
 
 Every scan is then also sent to the dashboard (portfolio view, trends, overdue findings). If the dashboard is down, the build is not affected. GitHub-hosted runners can only reach a dashboard that is reachable from the internet (or use a self-hosted runner inside your network).
 
+## Updates: new checks reach the repo by themselves
+By default the repo follows the newest Warden release (`channel=auto`), so a new check or rule pack added centrally runs on the **next** workflow run with nothing to change in the repo. Teams that want reviewed upgrades run `warden pin`. Details and the security trade-off: [updates-and-versions.md](updates-and-versions.md).
+
 ## Honest limits of GitHub-only
 - **No history or trends** across repositories; each run stands alone (the dashboard adds this).
 - **Annotations are capped** at 10 Critical + 10 High per run; the rest are in the summary and the artifact.

@@ -16,10 +16,10 @@ Generated from `tools/coverage_data.py` on 2026-11-19. The same data is in [secu
 | AI agent: red-team probes | Does a running agent resist real attack attempts? | 21 | 19 deterministic probes; DeepTeam (7 frameworks) and promptfoo templates |
 | AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 16 | agentsec (16 modules) |
 | Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 13 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
-| Developer workflow | Catches problems on the developer's machine before CI. | 3 | pre-push hook, pre-commit, PR template, IDE recommendations |
+| Developer workflow | Catches problems on the developer's machine before CI. | 4 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **122** | 21 scanner tools plus the library, gate and process kit |
+| **Total** |  | **123** | 21 scanner tools plus the library, gate and process kit |
 
 A *check* is one rule, probe or control we can name. Scanner tools such as Semgrep contain thousands of rules; they are counted once. Categories 1-8 find problems (scanners, probes, template/doc checks); the rest are controls you embed, decision logic and process.
 
@@ -27,7 +27,7 @@ A *check* is one rule, probe or control we can name. Scanner tools such as Semgr
 
 | Status | Meaning | Count |
 |---|---|---|
-| Verified | run end to end in this repo or on a real app | 89 |
+| Verified | run end to end in this repo or on a real app | 90 |
 | Verified (partial) | run, with a stated limit | 7 |
 | Wired, not run | wired up but never run (needs a key) | 1 |
 | Template | shipped template, not run with a real LLM | 8 |
@@ -111,7 +111,7 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 |---|---|---|
 | scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting | 22 |
 | scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers | 83 |
-| scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report | 50 |
+| scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script | 83 |
 | scripts/test-newtools.sh | SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs | 29 |
 | scripts/e2e-agent.sh | Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain | 12 |
 | scripts/test_gate.py | Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit) | 28 |
@@ -125,4 +125,4 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
 | agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
 | agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
-| **Total** |  | **409** |
+| **Total** |  | **442** |

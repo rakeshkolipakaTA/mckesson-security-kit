@@ -88,4 +88,49 @@ warden init --vendor >/dev/null 2>&1; check "init --vendor" 0 $?
 o="$(.security/warden config show 2>&1)"; grep -q 'preset=' <<< "$o"; check "vendored kit runs without warden on the PATH" 0 $?
 warden init >/dev/null 2>&1; [ -d .security/kit ]; check "re-running init keeps the repo's mode" 0 $?
 
+echo "== auto-update channel: new releases reach a repo with no change in the repo"
+SRCR="$T/srcrepo"; mkdir -p "$SRCR"; ( cd "$HERE" && git ls-files -co --exclude-standard | grep -v '^reports/' | tar -T - -cf - ) | tar -C "$SRCR" -xf -
+G="git -C $SRCR -c user.name=t -c user.email=t@t"; $G init -q -b main && $G add -A && $G commit -qm one && $G tag v1.0.0 && $G tag v1
+WH="$T/wh"; r2="$T/repo-auto"; cp -a "$HERE/examples/clean-python" "$r2"; rm -rf "$r2/.security"; git -C "$r2" init -q
+( cd "$r2" && "$V" init --source "git+file://$SRCR@v1.0.0" >"$T/ia.log" 2>&1 ); check "init from a release tag" 0 $?
+has "lock follows the major line (v1), not one release" '^source=git\+file://.*@v1$' "$r2/.security/warden.lock"
+has "lock says channel=auto" '^channel=auto$' "$r2/.security/warden.lock"
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden --version >"$T/a1.log" 2>&1 ); check "shim installs the newest v1 on first use" 0 $?
+has "first run reports the packaged version" "warden $VER" "$T/a1.log"
+[ "$(ls -d "$WH"/auto-* 2>/dev/null | wc -l)" = 1 ]; check "one cached copy" 0 $?
+echo "9.9.9" > "$SRCR/VERSION"; $G add -A && $G commit -qm two && $G tag -f v1 >/dev/null
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden --version >"$T/a2.log" 2>&1 ); check "next run after a new release" 0 $?
+has "the repo now runs the new release (nothing changed in the repo)" "warden 9.9.9" "$T/a2.log"
+[ "$(ls -d "$WH"/auto-* 2>/dev/null | wc -l)" = 2 ]; check "both copies cached" 0 $?
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden --version >"$T/a3.log" 2>&1 ); no "unchanged release is not reinstalled" "installing the newest" "$T/a3.log"
+cp "$r2/.security/warden.lock" "$T/lock.bak"; sed -i 's|^source=.*|source=git+file:///nonexistent-warden@v1|' "$r2/.security/warden.lock"
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden --version >"$T/a4.log" 2>&1 ); check "offline: falls back to the newest cached copy" 0 $?
+has "offline fallback says so" "cannot reach" "$T/a4.log"
+( cd "$r2" && WARDEN_HOME="$T/emptywh" PATH="/usr/bin:/bin" .security/warden --version >"$T/a5.log" 2>&1 ); check "offline with nothing cached fails clearly" 1 $?
+has "and tells the user what to do" "warden pin" "$T/a5.log"
+cp "$T/lock.bak" "$r2/.security/warden.lock"; $G tag v9.9.9
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden pin >"$T/pin.log" 2>&1 ); check "warden pin" 0 $?
+has "pin fixes the exact release" '^source=git\+file://.*@v9\.9\.9$' "$r2/.security/warden.lock"
+has "pin sets channel=pinned" '^channel=pinned$' "$r2/.security/warden.lock"
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden --version >"$T/a6.log" 2>&1 ); check "pinned repo runs" 0 $?
+has "pinned repo says it is pinned" "pinned to 9.9.9" "$T/a6.log"
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden pin --auto >"$T/pa.log" 2>&1 ); check "warden pin --auto" 0 $?
+has "back on the major line" '^source=git\+file://.*@v9$' "$r2/.security/warden.lock"
+( cd "$r2" && "$V" init --source "git+file://$SRCR@v1.0.0" >"$T/ib.log" 2>&1 ); check "re-running init keeps the channel the team chose" 0 $?
+has "channel preserved on upgrade" '^channel=auto$' "$r2/.security/warden.lock"
+( cd "$r2" && "$V" init --pin --source "git+file://$SRCR@v1.0.0" >"$T/ic.log" 2>&1 ); check "init --pin" 0 $?
+has "--pin writes a pinned lock" '^channel=pinned$' "$r2/.security/warden.lock"
+has "--pin keeps the exact tag" '^source=git\+file://.*@v1\.0\.0$' "$r2/.security/warden.lock"
+
+echo "== release script"
+RS="$SRCR/scripts/release.sh"
+( cd "$SRCR" && "$RS" 9.9.8 >"$T/rl1.log" 2>&1 ); check "release refuses a version that does not match VERSION" 1 $?
+echo "9.10.0" > "$SRCR/VERSION"; ( cd "$SRCR" && "$RS" 9.10.0 >"$T/rl2.log" 2>&1 ); check "release refuses a dirty tree" 1 $?
+$G add -A && $G commit -qm three
+( cd "$SRCR" && "$RS" 9.10.0 >"$T/rl3.log" 2>&1 ); check "release creates the tags" 0 $?
+$G rev-parse -q --verify refs/tags/v9.10.0 >/dev/null; check "release tag v9.10.0 exists" 0 $?
+[ "$($G rev-parse 'v9^{commit}')" = "$($G rev-parse 'v9.10.0^{commit}')" ]; check "the moving major tag points at the new release" 0 $?
+( cd "$SRCR" && "$RS" 9.10.0 >"$T/rl4.log" 2>&1 ); check "release refuses to reuse a tag" 1 $?
+has "release prints the push commands and does not push" "git push -f origin v9" "$T/rl3.log"
+
 echo; echo "package test: $PASS passed, $FAILN failed"; [ "$FAILN" = 0 ]
