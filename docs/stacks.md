@@ -7,7 +7,7 @@
 | **python** | + Bandit (code), pip-audit (dependencies of **every** `requirements*.txt` in the repo, plus root `pyproject.toml`/`setup.py`) |
 | **node** | + ESLint security rules (`.js .jsx .ts .tsx .mjs`), `npm audit` per `package-lock.json` |
 | **java** | Semgrep Java rules + Trivy on `pom.xml`/`build.gradle`; add Dependency-Check with `SEC_DEPCHECK=1` (see below) |
-| **agent** (AI agents, auto-detected from agent/LLM frameworks or MCP config) | + 16 agent Semgrep rules, inventory/registry scan (`agent-scan`), model-file scan; dynamic: `secscan redteam`. See [agentic-security.md](agentic-security.md) |
+| **agent** (AI agents, auto-detected from agent/LLM frameworks or MCP config) | + 16 agent Semgrep rules, inventory/registry scan (`agent-scan`), model-file scan; dynamic: `warden redteam`. See [agentic-security.md](agentic-security.md) |
 | **model files** (any repo with `.pkl .pt .pth .bin .ckpt .h5 .joblib .npy .keras`) | `modelscan` |
 | **Dockerfile** | Trivy checks the Dockerfile automatically; add `SEC_IMAGE=name:tag` (CI) to scan the built image |
 | **optional** | SonarQube (`SEC_SONAR=1`), ZAP DAST (`--zap-url`, QA only) |

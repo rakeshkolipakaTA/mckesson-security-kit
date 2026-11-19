@@ -1,5 +1,5 @@
 # .github/workflows/security-scan.yml  - security scan on every pull request and on main.
-# Starts report-only (SEC_PRESET=starter in .security/config.env). Change it to standard to block PRs: secscan config set SEC_PRESET standard.
+# Starts report-only (SEC_PRESET=starter in .security/config.env). Change it to standard to block PRs: warden config set SEC_PRESET standard.
 name: security-scan
 on:
   pull_request:
@@ -21,12 +21,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Security scan
-        run: .security/secscan scan
+        run: .security/warden scan
         env:
           # Only needed if you turned on SonarQube (SEC_SONAR=1). Set in repo Settings > Secrets and variables.
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+          WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
       - name: Show results on the run page
         if: always()
         run: |

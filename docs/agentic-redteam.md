@@ -19,7 +19,7 @@ with test users and test data. They can create sessions, send test emails and fi
 # 1) describe your API once (copy .security/redteam.json.example): endpoints, markers, destructive tools
 # 2) give it two TEST users' tokens (never real users) as CI secrets / env vars
 export REDTEAM_TOKEN=...  REDTEAM_TOKEN_B=...
-.security/secscan redteam --redteam-url https://qa-agent.example.com
+.security/warden redteam --redteam-url https://qa-agent.example.com
 ```
 Add `--redteam-network <docker-network>` when the agent runs in a local Docker network: this also enables the SSRF **canary** (the harness serves an internal URL and checks whether the agent fetched it).
 CI template: `.security/ci/security-redteam.github.yml` (weekly, manual trigger). Results appear in the normal report (`summary.html`, category *AI red team*).

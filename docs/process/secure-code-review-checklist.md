@@ -39,7 +39,7 @@ First look at the **security scan result** on the PR. A new Critical/High findin
 - [ ] Budgets exist (steps, tool calls, time, tokens); rate limiting on the agent's entry point.
 - [ ] Secrets are not in prompts or MCP configuration; system prompts hold nothing that must stay secret.
 - [ ] Actions are written to the audit log with the agent and the human they acted for.
-- [ ] A red-team probe or test covers the new risk (see `secscan redteam`).
+- [ ] A red-team probe or test covers the new risk (see `warden redteam`).
 
 ## Before approving
 - [ ] I understood the change well enough to explain how it could be abused.

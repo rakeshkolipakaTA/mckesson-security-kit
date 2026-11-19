@@ -48,7 +48,7 @@ Access piles up: people change teams, tokens outlive projects, agents get "tempo
 | Check | Done |
 |---|---|
 | Dashboard, SonarQube and ticketing logins reviewed; default passwords changed; shared login rotated | [ ] |
-| `SECSCAN_DASHBOARD_TOKEN`, `SONAR_TOKEN` and ticketing tokens rotated on schedule | [ ] |
+| `WARDEN_DASHBOARD_TOKEN`, `SONAR_TOKEN` and ticketing tokens rotated on schedule | [ ] |
 
 ## Outcome
 | Finding | Action | Owner | Done by |

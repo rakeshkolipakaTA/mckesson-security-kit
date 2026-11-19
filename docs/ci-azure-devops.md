@@ -4,7 +4,7 @@ Requirements: a Microsoft-hosted `ubuntu-latest` agent works (Docker is preinsta
 
 ## 1. Add the kit
 ```bash
-scripts/secscan init /path/to/repo --ci azure
+scripts/warden init /path/to/repo --ci azure
 git add .security && git commit -m "Add security scanning (report-only)" && git push
 ```
 This creates `.security/ci/azure-pipelines-security.yml`.

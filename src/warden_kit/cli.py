@@ -1,4 +1,4 @@
-"""`secscan` entry point: locate the bundled kit and hand over to its bash CLI (scripts/secscan)."""
+"""`warden` entry point: locate the bundled kit and hand over to its bash CLI (scripts/warden)."""
 import json
 import os
 import subprocess
@@ -16,17 +16,17 @@ def kit_root():
     checkout = os.path.abspath(os.path.join(HERE, "..", ".."))  # editable / development install
     if os.path.isfile(os.path.join(checkout, "scripts", "scan.sh")):
         return checkout
-    sys.exit("secscan: the scanning kit is missing from this installation; reinstall mckesson-secscan")
+    sys.exit("warden: the scanning kit is missing from this installation; reinstall warden-kit")
 
 
 def install_source():
-    """How this package was installed (so `secscan init` can pin the same source in the repo): git+URL@tag, a path, or the pinned version."""
-    override = os.environ.get("SECSCAN_SOURCE")
+    """How this package was installed (so `warden init` can pin the same source in the repo): git+URL@tag, a path, or the pinned version."""
+    override = os.environ.get("WARDEN_SOURCE")
     if override:
         return override
     try:
         from importlib import metadata
-        raw = metadata.distribution("mckesson-secscan").read_text("direct_url.json")
+        raw = metadata.distribution("warden-kit").read_text("direct_url.json")
         if raw:
             d = json.loads(raw)
             url, vcs = d.get("url", ""), d.get("vcs_info") or {}
@@ -37,7 +37,7 @@ def install_source():
                 return url[len("file://"):]
     except Exception:
         pass
-    return f"mckesson-secscan=={__version__}"
+    return f"warden-kit=={__version__}"
 
 
 def _make_executable(root):
@@ -46,7 +46,7 @@ def _make_executable(root):
         if os.path.isdir(full):
             for n in os.listdir(full):
                 p = os.path.join(full, n)
-                if n.endswith((".sh", ".py")) or n == "secscan":
+                if n.endswith((".sh", ".py")) or n == "warden":
                     try:
                         os.chmod(p, os.stat(p).st_mode | 0o111)
                     except OSError:
@@ -57,11 +57,11 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     root = kit_root()
     _make_executable(root)
-    env = dict(os.environ, SECSCAN_VERSION=__version__, SECSCAN_SOURCE=install_source(), SECSCAN_PYTHON=sys.executable)
+    env = dict(os.environ, WARDEN_VERSION=__version__, WARDEN_SOURCE=install_source(), WARDEN_PYTHON=sys.executable)
     try:
-        return subprocess.call(["bash", os.path.join(root, "scripts", "secscan")] + argv, env=env)
+        return subprocess.call(["bash", os.path.join(root, "scripts", "warden")] + argv, env=env)
     except FileNotFoundError:
-        print("secscan needs bash (Linux/macOS, or Git Bash / WSL on Windows).", file=sys.stderr)
+        print("warden needs bash (Linux/macOS, or Git Bash / WSL on Windows).", file=sys.stderr)
         return 127
 
 

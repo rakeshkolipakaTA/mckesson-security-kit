@@ -89,7 +89,7 @@ def run_command(argv, *, image=DEFAULT_IMAGE, timeout=10, memory="128m", cpus=0.
         return SandboxResult(False, error="refused: docker is not available; the code was NOT run (there is no host fallback)")
     if subprocess.run([docker, "image", "inspect", image], capture_output=True).returncode != 0:
         return SandboxResult(False, error=f"refused: image {image!r} is not present locally (pull it first; the sandbox never pulls)")
-    name = "secscan-sbx-" + uuid.uuid4().hex[:12]
+    name = "warden-sbx-" + uuid.uuid4().hex[:12]
     args = [docker] + _docker_args(name, image, argv, memory=memory, cpus=cpus, pids=pids, runtime=runtime, workdir_mb=workdir_mb, stdin=stdin)
     t0 = time.time()
     res = SandboxResult(False)

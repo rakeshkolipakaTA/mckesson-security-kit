@@ -15,7 +15,7 @@ import os
 import re
 import sys
 
-SKIP_DIRS = {".git", ".venv", "venv", "node_modules", ".security", "build", "dist", "site-packages", "__pycache__", "target", ".mypy_cache", ".pytest_cache", ".secscan-framework"}
+SKIP_DIRS = {".git", ".venv", "venv", "node_modules", ".security", "build", "dist", "site-packages", "__pycache__", "target", ".mypy_cache", ".pytest_cache", ".warden-framework"}
 CODE_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".json", ".yaml", ".yml", ".toml", ".env", ".cfg", ".ini"}
 FRAMEWORKS = {
     "langchain": "LangChain", "langgraph": "LangGraph", "langchain_core": "LangChain", "llama_index": "LlamaIndex", "openai": "OpenAI SDK",

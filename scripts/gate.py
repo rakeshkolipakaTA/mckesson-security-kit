@@ -724,12 +724,12 @@ def write_sarif(path, findings):
         res = {"ruleId": rid, "level": {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning"}.get(f["severity"], "note"),
                "message": {"text": f"[{f['severity']}] {f['title']}" + (f" Fix: {f['fix']}" if f.get("fix") else "")},
                "locations": [{"physicalLocation": {"artifactLocation": {"uri": f["path"]}, "region": region}}],
-               "partialFingerprints": {"secscan/v1": f["fingerprint"]}}
+               "partialFingerprints": {"warden/v1": f["fingerprint"]}}
         if f.get("excepted"):
             res["suppressions"] = [{"kind": "external", "justification": f["excepted"]}]
         results.append(res)
     sarif = {"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-             "runs": [{"tool": {"driver": {"name": "mckesson-secscan", "informationUri": "https://example.invalid/secscan", "rules": list(rules.values())}},
+             "runs": [{"tool": {"driver": {"name": "warden-kit", "informationUri": "https://example.invalid/warden", "rules": list(rules.values())}},
                        "results": results}]}
     json.dump(sarif, open(path, "w"), indent=1)
 

@@ -4,8 +4,8 @@ Copy this into your team's tracker. A normal developer can complete every item; 
 
 ## Setup
 - [ ] Repository and owner identified: ______________  Security contact: ______________
-- [ ] Docker available on dev machines and CI agents (`secscan doctor` is green)
-- [ ] `secscan init` run; `.security/` committed
+- [ ] Docker available on dev machines and CI agents (`warden doctor` is green)
+- [ ] `warden init` run; `.security/` committed
 - [ ] CI pipeline added (GitHub Actions / Jenkins / Azure DevOps) and a run is green
 - [ ] First report reviewed with the team; findings triaged (fix / baseline / exception)
 
@@ -25,7 +25,7 @@ Copy this into your team's tracker. A normal developer can complete every item; 
 
 ## Rollout
 - [ ] Report-only for 2-4 weeks (`SEC_PRESET=starter`); false positives tuned (allowlist/exceptions)
-- [ ] Baseline recorded for legacy findings (`secscan baseline`)
+- [ ] Baseline recorded for legacy findings (`warden baseline`)
 - [ ] Exceptions have reason, approver, expiry
 - [ ] `SEC_PRESET=standard` set; **security-scan** is a required check on `main`
 - [ ] `.security/` protected by CODEOWNERS
@@ -33,5 +33,5 @@ Copy this into your team's tracker. A normal developer can complete every item; 
 
 ## Ongoing
 - [ ] Team knows the remediation targets (proposed: Critical 3 days, High 14, Medium 60, Low 90; to be agreed with McKesson security)
-- [ ] Kit upgraded when the platform team announces a new version (`secscan init <repo>` again)
+- [ ] Kit upgraded when the platform team announces a new version (`warden init <repo>` again)
 - [ ] Expired exceptions reviewed monthly

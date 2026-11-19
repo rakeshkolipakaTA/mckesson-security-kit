@@ -1,6 +1,6 @@
 # agentsec: runtime controls for agents (reference library)
 
-Python, **standard library only**, `agentic/agentsec/`. Copy it into your service: `.security/secscan agentlib` (creates `./agentsec/`).
+Python, **standard library only**, `agentic/agentsec/`. Copy it into your service: `.security/warden agentlib` (creates `./agentsec/`).
 These are building blocks and reference implementations: review them, then connect them to your IdP, vault, gateway and SIEM. Tests (all runnable from a checkout): `python3 -W ignore -I agentic/tests/test_agentsec.py` (24), `test_agentsec_extra.py` (54, no Docker), `test_sandbox_docker.py` (17, real Docker), `test_vault_docker.py` (8, a real throw-away Vault; skipped if Docker/image is missing).
 A complete hardened agent using all of them: `examples/agent-sample-secure/`.
 

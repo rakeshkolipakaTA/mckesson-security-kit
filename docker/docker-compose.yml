@@ -29,11 +29,11 @@ services:
   dashboard:
     profiles: [dashboard]
     build: ../dashboard
-    image: mckesson-secscan-dashboard:1
+    image: warden-dashboard:1
     environment:
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?run scripts/platform-up.sh}
       DASHBOARD_INGEST_TOKEN: ${DASHBOARD_INGEST_TOKEN:?run scripts/platform-up.sh}
-      DASHBOARD_USER: ${DASHBOARD_USER:-secscan}
+      DASHBOARD_USER: ${DASHBOARD_USER:-warden}
       SONAR_PUBLIC_URL: ${SONAR_PUBLIC_URL:-}
       DASHBOARD_ALERT_WEBHOOK: ${DASHBOARD_ALERT_WEBHOOK:-}       # optional: Slack/Teams-compatible incoming webhook (docs/dashboard.md)
       DASHBOARD_ALERT_MIN: ${DASHBOARD_ALERT_MIN:-critical}

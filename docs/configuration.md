@@ -1,6 +1,6 @@
 # Configuration: what to switch on or off
 
-Everything a team can change lives in **one file**: `.security/config.env`. Run `.security/secscan config show` at any time to see what is running on your repo and why.
+Everything a team can change lives in **one file**: `.security/config.env`. Run `.security/warden config show` at any time to see what is running on your repo and why.
 
 Order of precedence (highest first): command-line flags, environment variables, `config.env`, the **preset**, built-in defaults.
 
@@ -12,7 +12,7 @@ Order of precedence (highest first): command-line flags, environment variables, 
 | `standard` | Fails the build when a change adds a new Critical/High finding | The team has cleaned up or baselined |
 | `strict` | `standard` plus the stricter `release` gate; SonarQube and Dependency-Check run when configured | Release branches, regulated apps |
 
-Change it with `secscan config set SEC_PRESET standard`. `SEC_ENFORCE` and `SEC_GATE` override single pieces of a preset if you need to.
+Change it with `warden config set SEC_PRESET standard`. `SEC_ENFORCE` and `SEC_GATE` override single pieces of a preset if you need to.
 The preset definitions live in the central policy (`configs/policies/policy.json`), so the platform team can adjust them for everyone.
 
 ## 2. Tools: `auto`, `on`, `off`
@@ -68,5 +68,5 @@ Severity thresholds, the required-tool list, scanner versions and the approved-m
 ## Commands
 | Command | Does |
 |---|---|
-| `secscan config show` | Prints preset, enforce/gate, detected stacks and, for each tool, run/skip and the reason |
-| `secscan config set KEY VALUE` | Edits one setting in `.security/config.env` (rejects unsafe values) |
+| `warden config show` | Prints preset, enforce/gate, detected stacks and, for each tool, run/skip and the reason |
+| `warden config set KEY VALUE` | Edits one setting in `.security/config.env` (rejects unsafe values) |

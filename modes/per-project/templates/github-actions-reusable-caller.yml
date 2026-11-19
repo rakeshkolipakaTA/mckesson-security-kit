@@ -17,4 +17,4 @@ jobs:
       framework-ref: b1751a0098d61c6822541dbc3dd0f4464fc42bd5   # the same commit: the scanner scripts it checks out are pinned too
     secrets:                  # pass only what is needed (delete the ones you do not use)
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}
+      WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}

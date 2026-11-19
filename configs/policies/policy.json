@@ -91,7 +91,7 @@
       }
     }
   },
-  "_overdue_note": "A finding recorded in baseline.json stops being 'existing' once it is older than sla_days for its severity: if its severity is in block_overdue it blocks again. Baselines without dates (old format) are not aged until re-created with `secscan baseline`.",
+  "_overdue_note": "A finding recorded in baseline.json stops being 'existing' once it is older than sla_days for its severity: if its severity is in block_overdue it blocks again. Baselines without dates (old format) are not aged until re-created with `warden baseline`.",
   "license_policy": {
     "deny": [
       "AGPL-*",

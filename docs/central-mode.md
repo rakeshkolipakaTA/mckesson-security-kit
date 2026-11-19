@@ -19,7 +19,7 @@ scripts/sonar-bootstrap.sh        # changes the default admin password, prints S
 Store the token in your secret manager / CI secret. Never commit it. Details: [sonar-setup.md](sonar-setup.md).
 
 ## 4. Scan
-(Developers use `secscan` inside their repo; this is the platform-team/central form. Settings can come from the repo's `.security/config.env` too.)
+(Developers use `warden` inside their repo; this is the platform-team/central form. Settings can come from the repo's `.security/config.env` too.)
 ```bash
 scripts/scan.sh /path/to/repo                                # report-only (pilot)
 scripts/scan.sh /path/to/repo --gate pr --enforce            # PR gate

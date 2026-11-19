@@ -18,7 +18,7 @@ def have_image():
 @unittest.skipUnless(have_image(), f"docker + image {DEFAULT_IMAGE} needed")
 class SandboxTests(unittest.TestCase):
     def tearDown(self):
-        left = subprocess.run(["docker", "ps", "-aq", "--filter", "name=secscan-sbx-"], capture_output=True, text=True).stdout.split()
+        left = subprocess.run(["docker", "ps", "-aq", "--filter", "name=warden-sbx-"], capture_output=True, text=True).stdout.split()
         self.assertEqual(left, [], "sandbox containers were left behind")
 
     def test_normal_code_runs_and_returns_output(self):
@@ -67,13 +67,13 @@ class SandboxTests(unittest.TestCase):
         canary = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
         canary.write("HOST_SECRET_CANARY")
         canary.close()
-        os.environ["SECSCAN_TEST_HOST_ENV"] = "HOST_ENV_CANARY"
+        os.environ["WARDEN_TEST_HOST_ENV"] = "HOST_ENV_CANARY"
         try:
             r = run_python(f"import os\nfor p in [{canary.name!r}, '/etc/shadow', '/root', '/var/run/docker.sock', '/home']:\n"
                            "    print(p, 'EXISTS' if os.path.exists(p) else 'GONE')\n"
                            "print('ENV', 'HOST_ENV_CANARY' in str(dict(os.environ)))\nprint('HOST', os.uname().nodename)")
         finally:
-            os.environ.pop("SECSCAN_TEST_HOST_ENV", None)
+            os.environ.pop("WARDEN_TEST_HOST_ENV", None)
             os.unlink(canary.name)
         self.assertNotIn("HOST_SECRET_CANARY", r.stdout)
         self.assertIn(f"{canary.name} GONE", r.stdout)

@@ -5,11 +5,11 @@
 
 DRY-RUN by default: prints what it would create (and which tickets already exist). --apply creates them.
 Findings are grouped (dependency CVEs per package+manifest; everything else per rule+file), one ticket per group, and each group
-carries a stable label  secscan-gk-<id>  so running again never creates a duplicate (and a closed ticket is not re-opened or re-created).
+carries a stable label  warden-gk-<id>  so running again never creates a duplicate (and a closed ticket is not re-opened or re-created).
 Nothing sensitive is sent: titles come from the already-redacted report and long token-like strings are scrubbed again.
 
 Which findings:  severity >= --min-severity (default high), not excepted, and  NEW (not in the baseline)  or  OVERDUE (past the SLA, per the dashboard)
-                 [--dashboard URL + SECSCAN_DASHBOARD_TOKEN]  or  everything with --include-existing.
+                 [--dashboard URL + WARDEN_DASHBOARD_TOKEN]  or  everything with --include-existing.
 
 Credentials come from the environment (CI secrets), never from files:
   GitHub : GITHUB_TOKEN (issues:write)   repo = --repo or GITHUB_REPOSITORY      [GITHUB_API_URL for GitHub Enterprise]
@@ -78,14 +78,14 @@ def build_groups(findings):
         g["items"].sort(key=lambda x: SEV.index(str(x["severity"]).upper()))
         g["severity"] = str(g["items"][0]["severity"]).upper()
         n = len(g["items"])
-        g["title"] = ("[secscan] %s %s%s" % (g["severity"], g["title"], " (%d findings)" % n if n > 1 else ""))[:120]
-        g["label"] = "secscan-gk-" + g["gk"]
+        g["title"] = ("[warden] %s %s%s" % (g["severity"], g["title"], " (%d findings)" % n if n > 1 else ""))[:120]
+        g["label"] = "warden-gk-" + g["gk"]
         out.append(g)
     return sorted(out, key=lambda g: (SEV.index(g["severity"]), -len(g["items"]), g["title"]))
 
 
 def body_for(g, ctx):
-    L = ["Found by the secscan pipeline scan (%s, branch `%s`, commit `%s`)." % (ctx["repo"], ctx["branch"], (ctx["commit"] or "")[:10]), ""]
+    L = ["Found by the warden pipeline scan (%s, branch `%s`, commit `%s`)." % (ctx["repo"], ctx["branch"], (ctx["commit"] or "")[:10]), ""]
     if ctx.get("run"):
         L += ["Run: %s" % ctx["run"], ""]
     L += ["| Severity | Finding | Location | What | Fix |", "|---|---|---|---|---|"]
@@ -95,7 +95,7 @@ def body_for(g, ctx):
     if len(g["items"]) > 25:
         L.append("\n...and %d more in the report." % (len(g["items"]) - 25))
     L += ["", "Fix it, or add a time-boxed exception (`.security/exceptions.json`). The remediation SLA is in the central policy.",
-          "", "<!-- secscan:gk=%s -->" % g["gk"]]
+          "", "<!-- warden:gk=%s -->" % g["gk"]]
     return "\n".join(L)
 
 
@@ -113,7 +113,7 @@ class Api:
             time.sleep(wait)
         data = json.dumps(body).encode() if body is not None else None
         for attempt in range(3):
-            req = urllib.request.Request(self.base + path, data=data, method=method, headers=dict(self.headers, **{"Content-Type": ctype, "User-Agent": "secscan-tickets"}))
+            req = urllib.request.Request(self.base + path, data=data, method=method, headers=dict(self.headers, **{"Content-Type": ctype, "User-Agent": "warden-tickets"}))
             self.last = time.time()
             try:
                 with urllib.request.urlopen(req, timeout=20) as r:
@@ -151,7 +151,7 @@ class GitHub:
         return (c == 200 and bool(r)), c
 
     def create(self, g, body):
-        c, r = self.api.call("POST", "/repos/%s/issues" % self.repo, {"title": g["title"], "body": body, "labels": ["secscan", g["label"], "severity:" + g["severity"].lower()]})
+        c, r = self.api.call("POST", "/repos/%s/issues" % self.repo, {"title": g["title"], "body": body, "labels": ["warden", g["label"], "severity:" + g["severity"].lower()]})
         return c in (200, 201), (r or {}).get("html_url", "") if c in (200, 201) else str((r or {}).get("error", c))
 
 
@@ -173,7 +173,7 @@ class Jira:
 
     def create(self, g, body):
         desc = re.sub(r"<!--.*?-->", "", body)
-        c, r = self.api.call("POST", "/rest/api/2/issue", {"fields": {"project": {"key": self.project}, "summary": g["title"], "description": desc, "issuetype": {"name": self.itype}, "labels": ["secscan", g["label"]]}})
+        c, r = self.api.call("POST", "/rest/api/2/issue", {"fields": {"project": {"key": self.project}, "summary": g["title"], "description": desc, "issuetype": {"name": self.itype}, "labels": ["warden", g["label"]]}})
         return c in (200, 201), (r or {}).get("key", "") if c in (200, 201) else str((r or {}).get("error", c))
 
 
@@ -196,14 +196,14 @@ class Azure:
         import html
         ops = [{"op": "add", "path": "/fields/System.Title", "value": g["title"]},
                {"op": "add", "path": "/fields/System.Description", "value": "<pre>%s</pre>" % html.escape(re.sub(r"<!--.*?-->", "", body))},
-               {"op": "add", "path": "/fields/System.Tags", "value": "secscan; " + g["label"]}]
+               {"op": "add", "path": "/fields/System.Tags", "value": "warden; " + g["label"]}]
         c, r = self.api.call("POST", "/%s/_apis/wit/workitems/$Bug?api-version=7.0" % self.project, ops, "application/json-patch+json")
         return c in (200, 201), str((r or {}).get("id", "")) if c in (200, 201) else str((r or {}).get("error", c))
 
 
 # ---------------------------------------------------------------- main
 def load_publish():
-    spec = importlib.util.spec_from_file_location("secscan_publish", os.path.join(os.path.dirname(os.path.abspath(__file__)), "publish.py"))
+    spec = importlib.util.spec_from_file_location("warden_publish", os.path.join(os.path.dirname(os.path.abspath(__file__)), "publish.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
@@ -225,7 +225,7 @@ def main(argv=None):
     ap.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     ap.add_argument("--min-severity", choices=["critical", "high"], default="high")
     ap.add_argument("--include-existing", action="store_true", help="also ticket findings that are in the baseline")
-    ap.add_argument("--dashboard", default=os.environ.get("SEC_DASHBOARD_URL", ""), help="read overdue findings from the dashboard (token: SECSCAN_DASHBOARD_TOKEN)")
+    ap.add_argument("--dashboard", default=os.environ.get("SEC_DASHBOARD_URL", ""), help="read overdue findings from the dashboard (token: WARDEN_DASHBOARD_TOKEN)")
     ap.add_argument("--apply", action="store_true", help="create the tickets (default is a dry run)")
     ap.add_argument("--max-issues", type=int, default=20, help="most tickets to create per target in one run")
     ap.add_argument("--delay", type=float, default=1.0, help="seconds between API calls")
@@ -239,7 +239,7 @@ def main(argv=None):
     pub = load_publish()
     repo, branch, commit, run = pub.ci_context(".")
     overdue = set()
-    tok = os.environ.get("SECSCAN_DASHBOARD_TOKEN", "")
+    tok = os.environ.get("WARDEN_DASHBOARD_TOKEN", "")
     if a.dashboard and tok:
         overdue = fetch_overdue(a.dashboard, tok, repo, branch, a.allow_http)
     groups = build_groups(select(findings, a.min_severity, a.include_existing, overdue))

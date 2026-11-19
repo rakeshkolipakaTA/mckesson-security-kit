@@ -1,10 +1,10 @@
 # GitHub Actions
 
-Two ways to use it. **Option A is the default**: `secscan init` sets it up for you.
+Two ways to use it. **Option A is the default**: `warden init` sets it up for you.
 
 ## Option A: kit in your repo (default)
-`secscan init` adds `.github/workflows/security-scan.yml` (also kept at `.security/ci/security-scan.github.yml`).
-It runs `.security/secscan scan` on every pull request, every push to `main`/`master`, and manually (Actions tab > security-scan > Run workflow).
+`warden init` adds `.github/workflows/security-scan.yml` (also kept at `.security/ci/security-scan.github.yml`).
+It runs `.security/warden scan` on every pull request, every push to `main`/`master`, and manually (Actions tab > security-scan > Run workflow).
 
 1. Commit and push `.security/` and `.github/workflows/security-scan.yml`.
 2. Open a pull request. A check named **security-scan** appears. Open it: the run page shows the summary table, and the **security-report** artifact holds the HTML report.
@@ -22,7 +22,7 @@ Pull requests from forks do not get secrets; SonarQube is skipped for them by Gi
 If your repo has GitHub code scanning (Advanced Security), uncomment the `upload-sarif` step at the bottom of the workflow and the `security-events: write` permission. Findings then appear under **Security > Code scanning**. SARIF contains source-code findings only (not ZAP URLs or image layers).
 
 ### Self-hosted runners
-Use `runs-on: [self-hosted, linux]`. The runner needs Docker and outbound access listed by `secscan doctor`.
+Use `runs-on: [self-hosted, linux]`. The runner needs Docker and outbound access listed by `warden doctor`.
 
 ## Option B: central reusable workflow (no kit in your repo)
 The platform team publishes `.github/workflows/security-scan-reusable.yml` in `mckesson-security-kit` (tag `v1`). Your repo only needs:

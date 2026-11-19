@@ -20,10 +20,10 @@ jobs:
       - name: ZAP baseline (passive, safe)
         env:
           QA_URL: ${{ vars.QA_URL }}
-        run: .security/secscan scan --zap-url "$QA_URL" --zap-mode baseline
+        run: .security/warden scan --zap-url "$QA_URL" --zap-mode baseline
         # For APIs, passive crawling finds little. Use an ACTIVE scan of specific URLs WITH parameters
         # (QA only, with the owners' approval):
-        #   .security/secscan scan --zap-mode full --zap-url "$QA_URL/search?q=test,$QA_URL/items/1"
+        #   .security/warden scan --zap-mode full --zap-url "$QA_URL/search?q=test,$QA_URL/items/1"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:

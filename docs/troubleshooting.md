@@ -11,15 +11,15 @@
 | Many `pip-audit` HIGH findings with no CVSS | pip-audit gives no severity; see [policy.md](policy.md). |
 | Secret false positive in test data | Allowlist in `.security/gitleaks.toml`, or a time-boxed exception. |
 | Dependency-Check very slow first time | NVD download without `NVD_API_KEY`; request a key and keep the `mckesson-depcheck-data` volume. |
-| `secscan doctor` shows a host as NOT reachable | A proxy/firewall blocks it. Ask the platform team to allow it or mirror it (see platform-setup.md). |
+| `warden doctor` shows a host as NOT reachable | A proxy/firewall blocks it. Ask the platform team to allow it or mirror it (see platform-setup.md). |
 | Semgrep: `Failed to download` / no rules | `semgrep.dev` blocked. Use offline rules: `SEC_SEMGREP_RULES=/path/to/rules` in config.env. |
 | `npm-audit` shows `invalid` | The audit returned an error (no network to the npm registry, or private registry auth). Check `<report>/npm-audit-<n>.log`. |
 | "no lockfile ... audited versions were freshly resolved" | Commit `package-lock.json`. |
 | eslint `invalid` / missing | ESLint crashed (see the scan output); check that your JS/TS files are valid syntax. |
 | config.env: "ignoring unknown key / unsupported characters" | Only the documented `SEC_*` keys and simple values (letters, digits, `_ . : / @ , = ? & % + -`) are accepted. Secrets never belong there. |
 | CI check is green but the report says FAIL | Report-only mode (`SEC_PRESET=starter`). Set `SEC_PRESET=standard` to enforce. |
-| Windows: `bash: secscan: command not found` | Use WSL2 or Git Bash and run `.security/secscan` from the repo root. |
-| First scan is slow | Images are downloaded once. `secscan pull` does it ahead of time; CI agents benefit from pre-baked images. |
+| Windows: `bash: warden: command not found` | Use WSL2 or Git Bash and run `.security/warden` from the repo root. |
+| First scan is slow | Images are downloaded once. `warden pull` does it ahead of time; CI agents benefit from pre-baked images. |
 | redteam: "refusing to report results that would pass only because every request is anonymous" | The agent rejected the test credential (HTTP 401/403). Set `REDTEAM_TOKEN` (and `REDTEAM_TOKEN_B`) to valid QA test-user tokens. |
 | redteam shows `missing` / "red team did not complete" | The harness could not reach the agent or crashed: see `<report>/redteam.log`. In Docker use `--redteam-network` and the container hostname. |
 | Many red-team probes SKIPPED | Fill the matching keys in `.security/redteam.json` (skips are never counted as passes). |

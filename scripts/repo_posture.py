@@ -27,7 +27,7 @@ class Api:
         self.token, self.base = token, base.rstrip("/")
 
     def get(self, path):
-        req = urllib.request.Request(self.base + path, headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json", "User-Agent": "secscan-repo-posture",
+        req = urllib.request.Request(self.base + path, headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json", "User-Agent": "warden-repo-posture",
                                                                  "X-GitHub-Api-Version": "2022-11-28"})
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
@@ -96,7 +96,7 @@ def main():
                                     ("REPO-NO-SECURITY-POLICY", "SECURITY.md (how to report a vulnerability)", ["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"], "LOW"),
                                     ("REPO-NO-DEPENDENCY-UPDATES", "dependabot.yml / renovate.json (automatic dependency updates)", [".github/dependabot.yml", ".github/dependabot.yaml", "renovate.json", ".github/renovate.json"], "LOW")):
         if not any(api.get(f"/repos/{slug}/contents/{p}")[0] == 200 for p in paths):
-            add(sev, rule, f"No {label}", "Add the file (templates: secscan init)")
+            add(sev, rule, f"No {label}", "Add the file (templates: warden init)")
     st, _ = api.get(f"/repos/{slug}/vulnerability-alerts")
     if st == 404:
         add("MEDIUM", "REPO-NO-ALERTS", "Dependabot vulnerability alerts are disabled", "Settings > Code security > enable Dependabot alerts")

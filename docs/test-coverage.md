@@ -76,7 +76,7 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 |---|---|---|---|---|
 | High | Secrets | Scan git history, not just the current files | Done | SEC_GITLEAKS_HISTORY: verified, shallow clones flagged |
 | High | Supply chain | SBOM generation + licence compliance | Done | SEC_SBOM and Trivy licences: verified; licence data only where manifests carry it |
-| High | Supply chain | Automated dependency-update pull requests | Done | secscan init generates the config; GitHub's service not run here |
+| High | Supply chain | Automated dependency-update pull requests | Done | warden init generates the config; GitHub's service not run here |
 | High | Process | Enforce remediation SLAs and create tickets | Done | Gate + dashboard verified; tickets and alerts tested against mock servers |
 | High | DAST | Authenticated and body-aware API testing | Done | Both verified; ZAP token reaches every request, fuzzer found 5xx on the sample |
 | Medium | Supply chain | Image signing, build provenance, pinned CI actions | Partly | zizmor + pinned templates verified; signing/provenance and Scorecard are templates, never run |

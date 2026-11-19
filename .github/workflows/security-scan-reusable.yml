@@ -11,7 +11,7 @@ on:
       framework-ref:  {type: string,  default: v1,    description: "Tag/branch of the templates repo to use"}
     secrets:
       SONAR_TOKEN:    {required: false}
-      SECSCAN_DASHBOARD_TOKEN: {required: false, description: "Publishes the result to the central dashboard (URL comes from configs/central.env or config.env)"}
+      WARDEN_DASHBOARD_TOKEN: {required: false, description: "Publishes the result to the central dashboard (URL comes from configs/central.env or config.env)"}
       NVD_API_KEY:    {required: false}
       FRAMEWORK_TOKEN: {required: false, description: "Token that can read the templates repo, only if it is private/internal"}
 permissions:
@@ -31,10 +31,10 @@ jobs:
           persist-credentials: false
           repository: rakeshkolipakaTA/mckesson-security-kit
           ref: ${{ inputs.framework-ref }}
-          path: .secscan-framework
+          path: .warden-framework
           token: ${{ secrets.FRAMEWORK_TOKEN || github.token }}
       - name: Move the framework out of the workspace (so it is not scanned as your code)
-        run: mv .secscan-framework "$RUNNER_TEMP/secscan-framework"
+        run: mv .warden-framework "$RUNNER_TEMP/warden-framework"
       - name: Scan
         env:
           SEC_ENFORCE: ${{ inputs.enforce && '1' || '' }}
@@ -42,18 +42,18 @@ jobs:
           SEC_IMAGE: ${{ inputs.image }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
-          SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}
+          WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: ${{ runner.temp }}/secscan-framework/scripts/scan.sh "$GITHUB_WORKSPACE" --out "$RUNNER_TEMP/secscan-report"
+        run: ${{ runner.temp }}/warden-framework/scripts/scan.sh "$GITHUB_WORKSPACE" --out "$RUNNER_TEMP/warden-report"
       - name: Show results on the run page
         if: always()
-        run: '[ -f "$RUNNER_TEMP/secscan-report/summary.md" ] && cat "$RUNNER_TEMP/secscan-report/summary.md" >> "$GITHUB_STEP_SUMMARY" || true'
+        run: '[ -f "$RUNNER_TEMP/warden-report/summary.md" ] && cat "$RUNNER_TEMP/warden-report/summary.md" >> "$GITHUB_STEP_SUMMARY" || true'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
           name: security-report
           path: |
-            ${{ runner.temp }}/secscan-report/summary.html
-            ${{ runner.temp }}/secscan-report/summary.md
-            ${{ runner.temp }}/secscan-report/results.sarif
+            ${{ runner.temp }}/warden-report/summary.html
+            ${{ runner.temp }}/warden-report/summary.md
+            ${{ runner.temp }}/warden-report/results.sarif
           retention-days: 14

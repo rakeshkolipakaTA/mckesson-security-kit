@@ -13,7 +13,7 @@ class build_py(_build_py):
     def run(self):
         super().run()
         here = os.path.dirname(os.path.abspath(__file__))
-        dest = os.path.join(self.build_lib, "mckesson_secscan", "kit")
+        dest = os.path.join(self.build_lib, "warden_kit", "kit")
         shutil.rmtree(dest, ignore_errors=True)
         for item in ITEMS:
             src, dst = os.path.join(here, item), os.path.join(dest, item)

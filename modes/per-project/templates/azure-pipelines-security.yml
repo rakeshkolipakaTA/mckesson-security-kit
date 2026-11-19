@@ -11,13 +11,13 @@ pool:
   vmImage: ubuntu-latest        # or your self-hosted agent pool (needs Docker)
 steps:
   - checkout: self
-  - script: .security/secscan scan
+  - script: .security/warden scan
     displayName: Security scan
     # Only if you enabled SonarQube (SEC_SONAR=1): define SONAR_HOST_URL / SONAR_TOKEN (secret) in the pipeline variables, then uncomment:
     # env:
     #   SONAR_HOST_URL: $(SONAR_HOST_URL)
     #   SONAR_TOKEN: $(SONAR_TOKEN)
-    #   SECSCAN_DASHBOARD_TOKEN: $(SECSCAN_DASHBOARD_TOKEN)   # optional: publish to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+    #   WARDEN_DASHBOARD_TOKEN: $(WARDEN_DASHBOARD_TOKEN)   # optional: publish to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
   - script: |
       f=$(find .security/reports -maxdepth 2 -name summary.md | sort | tail -1)
       [ -n "$f" ] && echo "##vso[task.uploadsummary]$PWD/$f"
@@ -32,5 +32,5 @@ steps:
   # CD: before pushing an image, add:
   # - script: |
   #     docker build -t $(IMAGE) .
-  #     .security/secscan gate --gate release --image $(IMAGE)
+  #     .security/warden gate --gate release --image $(IMAGE)
   #   displayName: Image security gate

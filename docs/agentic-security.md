@@ -1,15 +1,15 @@
 # Agentic AI security: what the framework covers
 
 Companion to the *Agentic Security* presentation (domains P1-P8, the threat catalog and the architectural controls). Same pipeline as the rest of the
-framework (`secscan`), plus agent-specific checks that switch on automatically when a repo uses an agent framework, an LLM SDK or MCP.
+framework (`warden`), plus agent-specific checks that switch on automatically when a repo uses an agent framework, an LLM SDK or MCP.
 
 ## How the pieces fit
 | Phase (presentation) | What runs | Where |
 |---|---|---|
 | **Design / build**: runtime controls | `agentsec` reference library: policy engine (PDP/PEP), fail-closed guardrails, safe paths, egress control, PII masking, approval gate, budgets, hash-chained audit log | `agentic/agentsec/` ([guide](agentic-runtime-library.md)) |
-| **Pull request**: static checks | 17 agent-specific Semgrep rules (incl. non-constant-time secret comparison); inventory + registry scan (models, endpoints, tools, MCP servers, prompt secrets); model-file scan (malicious pickle/PyTorch); plus the normal SAST/SCA/secrets/IaC | `secscan scan` (profile `agent` is auto-detected) |
+| **Pull request**: static checks | 17 agent-specific Semgrep rules (incl. non-constant-time secret comparison); inventory + registry scan (models, endpoints, tools, MCP servers, prompt secrets); model-file scan (malicious pickle/PyTorch); plus the normal SAST/SCA/secrets/IaC | `warden scan` (profile `agent` is auto-detected) |
 | **Deployment**: pipeline gates | image scan, release gate, DAST | [cd-release-gates.md](cd-release-gates.md) |
-| **QA / pre-release**: dynamic testing | deterministic red-team probes (canary based, no LLM needed); LLM-driven red teaming templates (DeepTeam, promptfoo) | `secscan redteam` ([guide](agentic-redteam.md)) |
+| **QA / pre-release**: dynamic testing | deterministic red-team probes (canary based, no LLM needed); LLM-driven red teaming templates (DeepTeam, promptfoo) | `warden redteam` ([guide](agentic-redteam.md)) |
 | **Runtime** | the controls inside your app (above) and the audit log | not a monitoring product: see gaps |
 
 ## Coverage by domain

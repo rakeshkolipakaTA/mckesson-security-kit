@@ -3,24 +3,24 @@
 The step-by-step guide is [GETTING-STARTED.md](GETTING-STARTED.md). This page is the reference.
 
 ```bash
-secscan init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor]
-cd /path/to/repo && .security/secscan doctor && .security/secscan scan
+warden init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor]
+cd /path/to/repo && .security/warden doctor && .security/warden scan
 ```
 
 Two ways the engine reaches a repo:
 
 | | **Thin** (default when installed with pip) | **Vendored** (`--vendor`; default from a framework checkout) |
 |---|---|---|
-| In the repo | config, CI files, launcher, `secscan.lock` (version pin) | all of that plus `.security/kit/` (the whole engine) |
-| Teammates / CI need | Docker, Python 3, access to the package source; the launcher installs the pinned version once into `~/.cache/secscan/<version>` | Docker only |
-| Upgrade | `pip install --upgrade ...` then `secscan upgrade` (a small diff: the pin) | re-run `init` from a newer checkout (a big diff) |
+| In the repo | config, CI files, launcher, `warden.lock` (version pin) | all of that plus `.security/kit/` (the whole engine) |
+| Teammates / CI need | Docker, Python 3, access to the package source; the launcher installs the pinned version once into `~/.cache/warden/<version>` | Docker only |
+| Upgrade | `pip install --upgrade ...` then `warden upgrade` (a small diff: the pin) | re-run `init` from a newer checkout (a big diff) |
 | Use when | normal repos | offline / air-gapped build agents |
 
 ## What `init` adds
 | Path | Owner | Purpose |
 |---|---|---|
-| `.security/secscan` | generated | The command (launcher in thin mode): `doctor`, `scan`, `gate`, `quick`, `baseline`, `open`, `config`, `disable`, `hook`, ... |
-| `.security/secscan.lock` | generated, commit it | The pinned secscan version (and where to install it from) |
+| `.security/warden` | generated | The command (launcher in thin mode): `doctor`, `scan`, `gate`, `quick`, `baseline`, `open`, `config`, `disable`, `hook`, ... |
+| `.security/warden.lock` | generated, commit it | The pinned warden version (and where to install it from) |
 | `.security/kit/` | generated, vendored mode only | Pinned scripts, configs, scanner Dockerfiles, `versions.env` |
 | `.security/config.env` | **you** | The settings: preset, per-tool switches, targets, excluded paths (see [configuration.md](configuration.md)). Created once |
 | `.security/exceptions.json`, `baseline.json` | you | Time-boxed finding exceptions and tool waivers / existing findings |
@@ -30,11 +30,11 @@ Two ways the engine reaches a repo:
 | `.security/reports/` | git-ignored | Output |
 
 ## Upgrading
-Thin: install the newer secscan, then `secscan upgrade` in the repo. It bumps `secscan.lock` and refreshes generated files, and never touches your config, exceptions or baseline. Review the diff in a PR.
-Vendored: re-run `secscan init <repo> --vendor` from a newer checkout.
+Thin: install the newer warden, then `warden upgrade` in the repo. It bumps `warden.lock` and refreshes generated files, and never touches your config, exceptions or baseline. Review the diff in a PR.
+Vendored: re-run `warden init <repo> --vendor` from a newer checkout.
 
 ## Taking it out
-`secscan disable --until DATE --reason "..."` pauses scanning (90 days at most, resumes by itself). `secscan uninstall` removes what `init` added and keeps your config, exceptions and baseline (`--purge` removes those too); `secscan reinstall` starts fresh.
+`warden disable --until DATE --reason "..."` pauses scanning (90 days at most, resumes by itself). `warden uninstall` removes what `init` added and keeps your config, exceptions and baseline (`--purge` removes those too); `warden reinstall` starts fresh.
 
 **Supply-chain note:** in thin mode the version pin lives in the repo, so a pull request could change it. Protect `.security/` and `.github/` with CODEOWNERS (the generated `CODEOWNERS.snippet` does this) and prefer the org-level required workflow for repos that need a stronger guarantee.
 

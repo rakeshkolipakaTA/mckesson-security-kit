@@ -6,13 +6,13 @@ import server as S
 from http.server import ThreadingHTTPServer
 
 PW, TOK = "correct-horse-battery", "t" * 32
-C = dict(user="secscan", password=PW, token=TOK, db=os.path.join(tempfile.mkdtemp(), "d.db"), stale=14, keep=3, sonar="http://sonar.example:9000")
+C = dict(user="warden", password=PW, token=TOK, db=os.path.join(tempfile.mkdtemp(), "d.db"), stale=14, keep=3, sonar="http://sonar.example:9000")
 S.db(C["db"]).close()
 S.H.log_message = lambda *a, **k: None
 srv = ThreadingHTTPServer(("127.0.0.1", 0), S.H); srv.c = C
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 BASE = f"http://127.0.0.1:{srv.server_address[1]}"
-AUTH = "Basic " + base64.b64encode(f"secscan:{PW}".encode()).decode()
+AUTH = "Basic " + base64.b64encode(f"warden:{PW}".encode()).decode()
 
 
 def call(path, method="GET", data=None, headers=None):
@@ -42,7 +42,7 @@ F = [{"severity": "CRITICAL", "tool": "semgrep", "rule": "r1", "location": "a.py
 def test_health_open_everything_else_needs_login():
     assert call("/health")[0] == 200
     assert call("/")[0] == 401 and call("/api/repos")[0] == 401
-    assert call("/", headers={"Authorization": "Basic " + base64.b64encode(b"secscan:wrong").decode()})[0] == 401
+    assert call("/", headers={"Authorization": "Basic " + base64.b64encode(b"warden:wrong").decode()})[0] == 401
 
 
 def test_ingest_requires_the_token():
@@ -98,7 +98,7 @@ def test_main_branch_preferred_on_the_portfolio():
 def test_publisher_end_to_end_and_never_breaks_a_build():
     rep = tempfile.mkdtemp()
     json.dump(summary(target="pub-app"), open(rep + "/summary.json", "w")); json.dump([dict(F[0], severity="HIGH")], open(rep + "/findings.json", "w"))
-    env = dict(os.environ, SECSCAN_DASHBOARD_TOKEN=TOK, GITHUB_ACTIONS="true", GITHUB_REPOSITORY="acme/published", GITHUB_REF_NAME="main", GITHUB_SHA="deadbeef", GITHUB_RUN_ID="42")
+    env = dict(os.environ, WARDEN_DASHBOARD_TOKEN=TOK, GITHUB_ACTIONS="true", GITHUB_REPOSITORY="acme/published", GITHUB_REF_NAME="main", GITHUB_SHA="deadbeef", GITHUB_RUN_ID="42")
     r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "publish.py"), "--report", rep, "--url", BASE], env=env, capture_output=True, text=True)
     assert r.returncode == 0 and "published acme/published" in r.stdout, r.stderr
     assert "actions/runs/42" in call("/repo/acme/published", headers={"Authorization": AUTH})[1]
@@ -106,8 +106,8 @@ def test_publisher_end_to_end_and_never_breaks_a_build():
     assert r.returncode == 0 and "could not reach" in r.stderr                      # a dead dashboard is a warning only
     r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "publish.py"), "--report", rep, "--url", "http://127.0.0.1:9", "--strict"], env=env, capture_output=True, text=True)
     assert r.returncode == 1
-    r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "publish.py"), "--report", rep, "--url", BASE], env=dict(env, SECSCAN_DASHBOARD_TOKEN="", CI="true"), capture_output=True, text=True)
-    assert r.returncode == 0 and "SECSCAN_DASHBOARD_TOKEN is not set" in r.stderr
+    r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "publish.py"), "--report", rep, "--url", BASE], env=dict(env, WARDEN_DASHBOARD_TOKEN="", CI="true"), capture_output=True, text=True)
+    assert r.returncode == 0 and "WARDEN_DASHBOARD_TOKEN is not set" in r.stderr
 
 
 # ---------------------------------------------------------------- SLA tracking

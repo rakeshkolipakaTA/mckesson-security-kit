@@ -20,7 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-UA = "secscan-exposure/1 (authorised security check)"
+UA = "warden-exposure/1 (authorised security check)"
 PORTS = {2375: ("Docker API", "HIGH"), 2379: ("etcd", "HIGH"), 6379: ("Redis", "HIGH"), 5432: ("PostgreSQL", "HIGH"), 3306: ("MySQL", "HIGH"), 27017: ("MongoDB", "HIGH"),
          9200: ("Elasticsearch", "HIGH"), 11211: ("Memcached", "HIGH"), 5601: ("Kibana", "MEDIUM"), 8500: ("Consul", "MEDIUM"), 4317: ("OpenTelemetry OTLP/gRPC", "MEDIUM"),
          4318: ("OpenTelemetry OTLP/HTTP", "MEDIUM"), 9090: ("Prometheus", "MEDIUM"), 9100: ("node_exporter", "MEDIUM"), 15672: ("RabbitMQ management", "MEDIUM")}

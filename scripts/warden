@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# secscan - the one command developers need.
-#   secscan doctor            check that this machine / CI runner can run the scans (Docker, network, images)
-#   secscan scan [flags]      scan this repo (report-only unless SEC_ENFORCE=1 in .security/config.env); prints where the report is
-#   secscan gate [flags]      same, but FAIL (exit 1) when the policy is violated - what CI uses to block a PR
-#   secscan quick             fast local check (no network-dependent dependency audits): secrets + code analysis
-#   secscan baseline          record today's findings as "existing" so only NEW High/Critical findings block (legacy apps)
-#   secscan config show       which tools run on this repo and why (preset, switches, required-tool lock, waivers)
-#   secscan config set KEY VALUE   change one setting in .security/config.env safely, e.g. config set SEC_PRESET standard | config set SEC_BANDIT off
-#   secscan tickets [--apply]  create GitHub / Jira / Azure DevOps tickets for new + overdue Critical/High findings (dry run unless --apply; see docs/dashboard.md)
-#   secscan publish           send the latest report to the central dashboard (CI does this automatically when SEC_DASHBOARD_URL is set)
-#   secscan open              open the latest HTML report
-#   secscan pull              download/build all scanner images now (so the first scan, or CI, is not slow)
-#   secscan redteam --redteam-url URL   (agents) run the AI red-team probes against a RUNNING QA agent you own; needs REDTEAM_TOKEN for authenticated agents
-#   secscan agentlib [dir]    (agents) copy the agentsec runtime-controls library (guardrails, policy, audit, ...) into your repo
-#   secscan hook install|remove   run `secscan quick` automatically before every `git push`
-#   secscan init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor]   add security scanning to a repo (default: current folder)
-#   secscan upgrade           refresh the generated files to the installed secscan version (keeps your config, exceptions, baseline)
-#   secscan disable --until YYYY-MM-DD --reason "text"   switch scanning off for a limited time (max 90 days); it resumes by itself
-#   secscan enable            end a disable early
-#   secscan uninstall [--yes] [--dry-run] [--purge]   remove what init added (keeps config/exceptions/baseline unless --purge)
-#   secscan reinstall         uninstall + init, for a repo where something broke
-#   secscan --version         the installed version (and the version this repo is pinned to)
+# warden - the one command developers need.
+#   warden doctor            check that this machine / CI runner can run the scans (Docker, network, images)
+#   warden scan [flags]      scan this repo (report-only unless SEC_ENFORCE=1 in .security/config.env); prints where the report is
+#   warden gate [flags]      same, but FAIL (exit 1) when the policy is violated - what CI uses to block a PR
+#   warden quick             fast local check (no network-dependent dependency audits): secrets + code analysis
+#   warden baseline          record today's findings as "existing" so only NEW High/Critical findings block (legacy apps)
+#   warden config show       which tools run on this repo and why (preset, switches, required-tool lock, waivers)
+#   warden config set KEY VALUE   change one setting in .security/config.env safely, e.g. config set SEC_PRESET standard | config set SEC_BANDIT off
+#   warden tickets [--apply]  create GitHub / Jira / Azure DevOps tickets for new + overdue Critical/High findings (dry run unless --apply; see docs/dashboard.md)
+#   warden publish           send the latest report to the central dashboard (CI does this automatically when SEC_DASHBOARD_URL is set)
+#   warden open              open the latest HTML report
+#   warden pull              download/build all scanner images now (so the first scan, or CI, is not slow)
+#   warden redteam --redteam-url URL   (agents) run the AI red-team probes against a RUNNING QA agent you own; needs REDTEAM_TOKEN for authenticated agents
+#   warden agentlib [dir]    (agents) copy the agentsec runtime-controls library (guardrails, policy, audit, ...) into your repo
+#   warden hook install|remove   run `warden quick` automatically before every `git push`
+#   warden init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor]   add security scanning to a repo (default: current folder)
+#   warden upgrade           refresh the generated files to the installed warden version (keeps your config, exceptions, baseline)
+#   warden disable --until YYYY-MM-DD --reason "text"   switch scanning off for a limited time (max 90 days); it resumes by itself
+#   warden enable            end a disable early
+#   warden uninstall [--yes] [--dry-run] [--purge]   remove what init added (keeps config/exceptions/baseline unless --purge)
+#   warden reinstall         uninstall + init, for a repo where something broke
+#   warden --version         the installed version (and the version this repo is pinned to)
 # Flags for scan/gate are documented in `scan.sh --help` (e.g. --sonar, --image app:tag, --zap-url ...).
 set -uo pipefail
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"; ROOT="$(dirname "$(dirname "$SELF")")"
@@ -35,7 +35,7 @@ ok() { printf '  \033[32m✔\033[0m %s\n' "$*"; }; bad() { printf '  \033[31m✘
 
 cmd_doctor() {
   local fails=0 pull=0; [ "${1:-}" = "--pull" ] && pull=1
-  echo "secscan doctor"
+  echo "warden doctor"
   command -v docker >/dev/null 2>&1 && ok "docker CLI: $(docker --version | cut -d, -f1)" || { bad "docker not found. Install Docker Desktop (Windows/Mac) or Docker Engine (Linux): https://docs.docker.com/get-docker/"; fails=$((fails+1)); }
   if docker info >/dev/null 2>&1; then ok "docker daemon is running"; else bad "docker daemon not reachable. Start Docker Desktop, or on Linux add yourself to the docker group: sudo usermod -aG docker \$USER (then log in again)"; fails=$((fails+1)); fi
   command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; sys.exit(0 if sys.version_info>=(3,8) else 1)' && ok "python3 $(python3 -V 2>&1 | cut -d' ' -f2) (used only to evaluate results, standard library only)" || { bad "python3 >= 3.8 is required"; fails=$((fails+1)); }
@@ -50,14 +50,14 @@ cmd_doctor() {
   echo "  scanner images:"
   local img
   for img in "$TRIVY_IMAGE" "$GITLEAKS_IMAGE" "$SEMGREP_IMAGE" "$SCANNER_IMAGE" "$SCANNER_NODE_IMAGE"; do
-    if docker image inspect "$img" >/dev/null 2>&1; then ok "${img%%@*}"; else warn "${img%%@*} not downloaded yet (happens on first scan; run 'secscan pull' to do it now)"; fi
+    if docker image inspect "$img" >/dev/null 2>&1; then ok "${img%%@*}"; else warn "${img%%@*} not downloaded yet (happens on first scan; run 'warden pull' to do it now)"; fi
   done
   [ "$pull" = 1 ] && [ "$fails" = 0 ] && cmd_pull
-  local lv; lv="$(lock_get version)"; local me="${SECSCAN_VERSION:-$(head -1 "$ROOT/VERSION" 2>/dev/null)}"
-  if [ -n "$lv" ]; then [ "$lv" = "$me" ] && ok "secscan $me matches this repo's pin (secscan.lock)" || warn "this repo is pinned to secscan $lv but $me is running; 'secscan upgrade' moves the repo to $me"; fi
+  local lv; lv="$(lock_get version)"; local me="${WARDEN_VERSION:-$(head -1 "$ROOT/VERSION" 2>/dev/null)}"
+  if [ -n "$lv" ]; then [ "$lv" = "$me" ] && ok "warden $me matches this repo's pin (warden.lock)" || warn "this repo is pinned to warden $lv but $me is running; 'warden upgrade' moves the repo to $me"; fi
   local cfg; cfg="$( [ "$IN_KIT" = 1 ] && echo "$(dirname "$ROOT")/config.env" || echo ".security/config.env")"
   if [ -f "$cfg" ]; then ok "config: $cfg ($(grep -qE '^[[:space:]]*SEC_ENFORCE=1' "$cfg" && echo 'ENFORCING - blocks the build on policy violations' || echo "preset $(sed -n 's/^SEC_PRESET=//p' "$cfg" | head -1)"))"; else warn "no .security/config.env here (defaults: auto-detect stack, report-only)"; fi
-  [ "$fails" = 0 ] && { echo "Ready. Try: secscan scan"; return 0; } || { echo "Fix the ✘ items above and re-run: secscan doctor"; return 1; }
+  [ "$fails" = 0 ] && { echo "Ready. Try: warden scan"; return 0; } || { echo "Fix the ✘ items above and re-run: warden doctor"; return 1; }
 }
 cmd_pull() {
   echo "Pulling scanner images (one-time, a few GB)..."
@@ -71,25 +71,25 @@ cmd_config() {
   case "${1:-show}" in
     show) "$SCAN" $(target_args) --explain;;
     set)  local k="${2:-}" v="${3:-}"
-          [[ "$k" =~ ^SEC_[A-Z_]+$ ]] && [[ "$v" =~ ^[A-Za-z0-9_./:@,=?\&%+*-]*$ ]] && [ -n "$v" ] || { echo "usage: secscan config set SEC_KEY value   (letters, digits and _./:@,=?&%+*- only)"; return 2; }
-          [ -f "$cfg" ] || { echo "no $cfg - run 'secscan init' first"; return 1; }
+          [[ "$k" =~ ^SEC_[A-Z_]+$ ]] && [[ "$v" =~ ^[A-Za-z0-9_./:@,=?\&%+*-]*$ ]] && [ -n "$v" ] || { echo "usage: warden config set SEC_KEY value   (letters, digits and _./:@,=?&%+*- only)"; return 2; }
+          [ -f "$cfg" ] || { echo "no $cfg - run 'warden init' first"; return 1; }
           if grep -qE "^[[:space:]]*#?[[:space:]]*$k=" "$cfg"; then
             local tmp; tmp="$(mktemp)"; awk -v k="$k" -v v="$v" 'BEGIN{done=0} { if (!done && $0 ~ "^[ \t]*#?[ \t]*"k"=") { print k"="v; done=1 } else print }' "$cfg" > "$tmp" && cat "$tmp" > "$cfg"; rm -f "$tmp"
           else printf '%s=%s\n' "$k" "$v" >> "$cfg"; fi
           echo "set $k=$v in $cfg"; local o; o="$("$SCAN" $(target_args) --explain 2>&1)"; printf '%s\n' "$o" | sed -n 1,3p; return 0;;
-    *) echo "usage: secscan config show | set KEY VALUE"; return 2;;
+    *) echo "usage: warden config show | set KEY VALUE"; return 2;;
   esac
 }
 sec_dir() { [ "$IN_KIT" = 1 ] && dirname "$ROOT" || echo ".security"; }
-lock_get() { sed -n "s/^$1=//p" "$(sec_dir)/secscan.lock" 2>/dev/null | head -1 | tr -d '\r'; }
+lock_get() { sed -n "s/^$1=//p" "$(sec_dir)/warden.lock" 2>/dev/null | head -1 | tr -d '\r'; }
 cmd_disable() {
   local until="" reason="" cfg; cfg="$(sec_dir)/config.env"
   while [ $# -gt 0 ]; do case "$1" in --until) until="${2:-}"; shift 2;; --reason) reason="${2:-}"; shift 2;; *) echo "unknown option $1"; return 2;; esac; done
-  [[ "$until" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && [ -n "$reason" ] || { echo 'usage: secscan disable --until YYYY-MM-DD --reason "why"   (scanning resumes by itself after that date, 90 days at most)'; return 2; }
+  [[ "$until" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && [ -n "$reason" ] || { echo 'usage: warden disable --until YYYY-MM-DD --reason "why"   (scanning resumes by itself after that date, 90 days at most)'; return 2; }
   local today max; today="$(date +%F)"; max="$(date -d "+90 days" +%F 2>/dev/null || date -v+90d +%F 2>/dev/null)"
   [[ "$until" > "$today" ]] || { echo "--until must be a future date"; return 2; }
   [ -z "$max" ] || [[ "$until" < "$max" ]] || [ "$until" = "$max" ] || { echo "--until is more than 90 days away (latest allowed: $max). For longer, ask your security contact for a policy exception."; return 2; }
-  [ -f "$cfg" ] || { echo "no $cfg - run 'secscan init' first"; return 1; }
+  [ -f "$cfg" ] || { echo "no $cfg - run 'warden init' first"; return 1; }
   grep -v -E '^(SEC_DISABLED_UNTIL=|# disabled )' "$cfg" > "$cfg.tmp" && cat "$cfg.tmp" > "$cfg"; rm -f "$cfg.tmp"
   printf '# disabled on %s by %s: %s\nSEC_DISABLED_UNTIL=%s\n' "$today" "$(git config user.email 2>/dev/null || echo unknown)" "${reason//[^A-Za-z0-9 ._,:@/()-]/}" "$until" >> "$cfg"
   echo "Security scanning is DISABLED until $until. Review this change in your pull request; it is visible to your security contact."
@@ -103,7 +103,7 @@ cmd_uninstall() {
   while [ $# -gt 0 ]; do case "$1" in --yes|-y) yes=1;; --dry-run) dry=1;; --purge) purge=1;; *) echo "unknown option $1"; return 2;; esac; shift; done
   [ -d "$s" ] || { echo "nothing to remove: no $s here"; return 0; }
   local items=() f
-  for f in kit secscan secscan.lock README.md ci .gitignore reports; do [ -e "$s/$f" ] && items+=("$s/$f"); done
+  for f in kit warden warden.lock README.md ci .gitignore reports; do [ -e "$s/$f" ] && items+=("$s/$f"); done
   [ "$purge" = 1 ] && for f in config.env exceptions.json baseline.json redteam.json zap-rules.tsv; do [ -e "$s/$f" ] && items+=("$s/$f"); done
   local wf=".github/workflows/security-scan.yml" rmwf=0
   if [ -f "$wf" ] && head -1 "$wf" | grep -q 'security-scan.yml  - security scan on every pull request' ; then items+=("$wf"); rmwf=1; fi
@@ -118,15 +118,15 @@ cmd_uninstall() {
 }
 cmd_open() {
   local dir; dir="$( [ "$IN_KIT" = 1 ] && echo "$(dirname "$ROOT")/reports/latest" || { [ -d .security ] && echo ".security/reports/latest" || echo "reports/latest"; } )"
-  [ -f "$dir/summary.html" ] || { echo "no report yet - run: secscan scan"; return 1; }
+  [ -f "$dir/summary.html" ] || { echo "no report yet - run: warden scan"; return 1; }
   echo "$(readlink -f "$dir/summary.html")"; (xdg-open "$dir/summary.html" || open "$dir/summary.html") >/dev/null 2>&1 || true
 }
 cmd_hook() {
   local gitdir; gitdir="$(git rev-parse --git-dir 2>/dev/null)" || { echo "not a git repository"; return 1; }
   case "${1:-}" in
-    install) printf '#!/usr/bin/env bash\n# installed by secscan\nexec "$(git rev-parse --show-toplevel)/.security/secscan" quick\n' > "$gitdir/hooks/pre-push"; chmod +x "$gitdir/hooks/pre-push"; echo "pre-push hook installed (bypass once with: git push --no-verify)";;
+    install) printf '#!/usr/bin/env bash\n# installed by warden\nexec "$(git rev-parse --show-toplevel)/.security/warden" quick\n' > "$gitdir/hooks/pre-push"; chmod +x "$gitdir/hooks/pre-push"; echo "pre-push hook installed (bypass once with: git push --no-verify)";;
     remove)  rm -f "$gitdir/hooks/pre-push"; echo "pre-push hook removed";;
-    *) echo "usage: secscan hook install|remove"; return 2;;
+    *) echo "usage: warden hook install|remove"; return 2;;
   esac
 }
 
@@ -142,11 +142,11 @@ case "$c" in
   disable)  cmd_disable "$@";;
   enable)   cmd_enable;;
   uninstall) cmd_uninstall "$@";;
-  upgrade)  [ "$IN_KIT" = 1 ] && { echo "this repo vendors its engine: upgrade it from the framework checkout with 'scripts/secscan init <repo>'"; exit 2; }
+  upgrade)  [ "$IN_KIT" = 1 ] && { echo "this repo vendors its engine: upgrade it from the framework checkout with 'scripts/warden init <repo>'"; exit 2; }
             exec "$ROOT/modes/per-project/install.sh" . "$@";;
-  reinstall) [ "$IN_KIT" = 1 ] && { echo "run reinstall from the framework checkout or with the installed secscan (not from a vendored kit)"; exit 2; }
+  reinstall) [ "$IN_KIT" = 1 ] && { echo "run reinstall from the framework checkout or with the installed warden (not from a vendored kit)"; exit 2; }
             cmd_uninstall --yes >/dev/null && exec "$ROOT/modes/per-project/install.sh" . "$@";;
-  --version|-V|version) echo "secscan ${SECSCAN_VERSION:-$(cat "$ROOT/VERSION" 2>/dev/null | head -1)}"; l="$(lock_get version)"; [ -z "$l" ] || echo "this repo is pinned to $l";;
+  --version|-V|version) echo "warden ${WARDEN_VERSION:-$(cat "$ROOT/VERSION" 2>/dev/null | head -1)}"; l="$(lock_get version)"; [ -z "$l" ] || echo "this repo is pinned to $l";;
   hook)     cmd_hook "$@";;
   scan)     exec "$SCAN" $(target_args) "$@";;
   gate)     exec "$SCAN" $(target_args) --enforce "$@";;
@@ -154,8 +154,8 @@ case "$c" in
   redteam)  exec "$SCAN" $(target_args) --partial --skip gitleaks,trivy,semgrep,bandit,pip-audit,npm-audit,eslint,agent-scan,modelscan "$@";;
   agentlib) dest="${1:-agentsec}"; [ -e "$dest" ] && { echo "$dest already exists"; exit 1; }; cp -r "$ROOT/agentic/agentsec" "$dest" && rm -rf "$dest/__pycache__" && echo "copied agentsec to $dest/ (stdlib only). See docs/agentic-runtime-library.md";;
   baseline) exec "$SCAN" $(target_args) --write-baseline "$@";;
-  init)     [ "$IN_KIT" = 1 ] && { echo "run init from the framework checkout or the installed secscan, not from inside a repo's kit"; exit 2; }
+  init)     [ "$IN_KIT" = 1 ] && { echo "run init from the framework checkout or the installed warden, not from inside a repo's kit"; exit 2; }
             exec "$ROOT/modes/per-project/install.sh" "$@";;
   help|-h|--help) awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$SELF";;
-  *) echo "unknown command '$c' (try: secscan help)"; exit 2;;
+  *) echo "unknown command '$c' (try: warden help)"; exit 2;;
 esac

@@ -18,7 +18,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Red-team probes
-        run: .security/secscan redteam --redteam-url "$QA_AGENT_URL" --redteam-contract .security/redteam.json
+        run: .security/warden redteam --redteam-url "$QA_AGENT_URL" --redteam-contract .security/redteam.json
         env:
           QA_AGENT_URL: ${{ vars.QA_AGENT_URL }}
           REDTEAM_TOKEN: ${{ secrets.REDTEAM_TOKEN }}

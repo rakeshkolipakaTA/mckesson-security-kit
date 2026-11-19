@@ -113,7 +113,7 @@ def test_grouping_per_package_and_per_rule_file():
     assert len(groups) == 2
     pil = [g for g in groups if "pillow" in g["title"]][0]
     assert len(pil["items"]) == 2 and pil["severity"] == "CRITICAL" and "requirements.txt" in pil["title"]
-    assert pil["label"].startswith("secscan-gk-") and len(pil["label"]) == len("secscan-gk-") + 12
+    assert pil["label"].startswith("warden-gk-") and len(pil["label"]) == len("warden-gk-") + 12
     again = T.build_groups(T.select(FINDINGS, "high", False, set()))
     assert {g["label"] for g in again} == {g["label"] for g in groups}                    # stable ids: the basis of de-duplication
 
@@ -121,7 +121,7 @@ def test_grouping_per_package_and_per_rule_file():
 def test_tickets_never_contain_credential_like_text():
     g = [g for g in T.build_groups(T.select(FINDINGS, "high", False, set())) if "sqli" in g["title"]][0]
     body = T.body_for(g, dict(repo="o/r", branch="main", commit="abc", run=""))
-    assert "ghp_abcdefghijklmnopqrstuvwxyz" not in body and "<redacted>" in body and "secscan:gk=" in body
+    assert "ghp_abcdefghijklmnopqrstuvwxyz" not in body and "<redacted>" in body and "warden:gk=" in body
     assert "<redacted>" in T.scrub("key AKIAABCDEFGHIJKLMNOP here") and "AKIAABCDEFGHIJKLMNOP" not in T.scrub("key AKIAABCDEFGHIJKLMNOP here")
     assert T.scrub("normal sentence about frontend/src/app/pages/page.ts") == "normal sentence about frontend/src/app/pages/page.ts"   # paths and prose survive
 
@@ -138,8 +138,8 @@ def test_github_apply_then_rerun_is_idempotent():
     rc, out, _ = run(["--apply"])
     assert rc == 0 and len(STORE["github"]) == 2 and out.count("created") == 2
     first = STORE["github"][0]
-    assert "secscan" in first["labels"] and any(l.startswith("secscan-gk-") for l in first["labels"]) and "severity:critical" in first["labels"]
-    assert "secscan:gk=" in first["body"] and first["title"].startswith("[secscan] CRITICAL")
+    assert "warden" in first["labels"] and any(l.startswith("warden-gk-") for l in first["labels"]) and "severity:critical" in first["labels"]
+    assert "warden:gk=" in first["body"] and first["title"].startswith("[warden] CRITICAL")
     rc, out, _ = run(["--apply"])
     assert rc == 0 and len(STORE["github"]) == 2 and out.count("exists") == 2             # no duplicates
     assert all(a == "Bearer " + ENV["GITHUB_TOKEN"] for m, p, a in STORE["calls"] if p.startswith("/repos/"))
@@ -148,13 +148,13 @@ def test_github_apply_then_rerun_is_idempotent():
 def test_jira_and_azure_create_and_dedupe():
     reset()
     rc, out, _ = run(["--apply", "--target", "jira"])
-    assert rc == 0 and len(STORE["jira"]) == 2 and STORE["jira"][0]["fields"]["project"]["key"] == "SEC" and "secscan" in STORE["jira"][0]["fields"]["labels"]
+    assert rc == 0 and len(STORE["jira"]) == 2 and STORE["jira"][0]["fields"]["project"]["key"] == "SEC" and "warden" in STORE["jira"][0]["fields"]["labels"]
     assert "<!--" not in STORE["jira"][0]["fields"]["description"]
     want = "Basic " + base64.b64encode(b"bot@example.com:jira-fake").decode()
     assert all(a == want for m, p, a in STORE["calls"] if p.startswith("/rest/"))
     run(["--apply", "--target", "jira"]); assert len(STORE["jira"]) == 2
     rc, out, _ = run(["--apply", "--target", "azure"])
-    assert rc == 0 and len(STORE["azure"]) == 2 and "secscan-gk-" in STORE["azure"][0]["tags"] and "&lt;" not in STORE["azure"][0]["desc"].replace("&lt;redacted&gt;", "")
+    assert rc == 0 and len(STORE["azure"]) == 2 and "warden-gk-" in STORE["azure"][0]["tags"] and "&lt;" not in STORE["azure"][0]["desc"].replace("&lt;redacted&gt;", "")
     azauth = "Basic " + base64.b64encode(b":azdo-fake").decode()
     assert all(a == azauth for m, p, a in STORE["calls"] if "_apis" in p)
     run(["--apply", "--target", "azure"]); assert len(STORE["azure"]) == 2
@@ -204,7 +204,7 @@ def test_overdue_findings_from_the_dashboard_are_ticketed_even_when_in_baseline(
     durl = "http://127.0.0.1:%d" % dash.server_address[1]
     import urllib.request
     # the repo/branch tickets.py reports are what publish.ci_context finds: mimic them through the CI environment
-    env = {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "o/r", "GITHUB_REF_NAME": "main", "GITHUB_SHA": "abc", "GITHUB_RUN_ID": "1", "SECSCAN_DASHBOARD_TOKEN": C["token"]}
+    env = {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "o/r", "GITHUB_REF_NAME": "main", "GITHUB_SHA": "abc", "GITHUB_RUN_ID": "1", "WARDEN_DASHBOARD_TOKEN": C["token"]}
     summ = {"target": "r", "counts": {"CRITICAL": 0, "HIGH": 2, "MEDIUM": 0, "LOW": 0, "INFO": 0}, "tool_status": {"semgrep": "ok"}, "result": "FAIL", "sla_days": {"CRITICAL": 3, "HIGH": 14, "MEDIUM": 60, "LOW": 90}}
     fl = [F("fp000004", "HIGH", "old-one", "app/old.py:1", new=False), F("fp000007", "HIGH", "fresh-baseline", "app/b.py:1", new=False)]
     req = urllib.request.Request(durl + "/api/ingest", data=json.dumps({"repo": "o/r", "branch": "main", "summary": summ, "findings": fl}).encode(), method="POST", headers={"Authorization": "Bearer " + C["token"], "Content-Type": "application/json"})

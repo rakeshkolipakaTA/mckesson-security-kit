@@ -55,7 +55,7 @@ Signals: a CVE or advisory for something you ship (especially "malicious package
 
 | Step | Action | Done |
 |---|---|---|
-| Identify | which repos, images and environments contain it? use the SBOM or `secscan` reports; search lockfiles | [ ] |
+| Identify | which repos, images and environments contain it? use the SBOM or `warden` reports; search lockfiles | [ ] |
 | Contain | stop deploying; pin or remove the dependency; roll back to the last known-good, signed image; block the package or registry source | [ ] |
 | Assume secrets in CI were exposed | rotate every secret the build could read; review recent CI runs and workflow changes | [ ] |
 | Verify | rebuild from clean runners; verify signatures and provenance (`cosign verify`, `gh attestation verify`); rescan the image | [ ] |

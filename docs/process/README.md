@@ -13,6 +13,6 @@ Tools find known patterns. People find design flaws, decide what is acceptable, 
 | [Penetration-test scope and rules of engagement](pentest-scope-template.md) | commissioning a manual test of an app or agent | team lead, security, tester | before major releases; yearly |
 | [Security-champions guide](security-champions-guide.md) | setting up one security contact per team | security lead, champions | ongoing |
 
-How they connect to the tooling: the scanners in this kit produce findings and the [dashboard](../dashboard.md) tracks their age against the SLAs in the [policy](vulnerability-management-policy.md); [`secscan tickets`](../dashboard.md#tickets) gives each finding an owner; [runtime detection](../runtime-detection.md) feeds the [runbook](incident-response-runbook.md).
+How they connect to the tooling: the scanners in this kit produce findings and the [dashboard](../dashboard.md) tracks their age against the SLAs in the [policy](vulnerability-management-policy.md); [`warden tickets`](../dashboard.md#tickets) gives each finding an owner; [runtime detection](../runtime-detection.md) feeds the [runbook](incident-response-runbook.md).
 
 These are starting points, not legal or compliance advice. Have your security and legal teams adapt them to your organisation and any regulation that applies.

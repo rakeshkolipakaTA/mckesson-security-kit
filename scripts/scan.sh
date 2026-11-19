@@ -2,7 +2,7 @@
 # McKesson security scan runner.
 #   scripts/scan.sh <repo-path> [options]        central mode: scan any repo from one install
 #   .security/kit/scripts/scan.sh [options]      per-project kit: scans the enclosing repo
-# Developers normally use the `secscan` wrapper instead (docs/GETTING-STARTED.md).
+# Developers normally use the `warden` wrapper instead (docs/GETTING-STARTED.md).
 #
 # Settings come from (highest first): command-line flags > environment variables (SEC_*) > <repo>/.security/config.env > defaults.
 #
@@ -16,9 +16,9 @@
 #   --skip a,b              SEC_SKIP      legacy list form of "=off": gitleaks,trivy,semgrep,bandit,pip-audit,npm-audit,eslint,agent-scan,modelscan
 #   new checks (all SEC_<TOOL>=auto|on|off): GITLEAKS_HISTORY (secrets in past commits), SBOM, WORKFLOW_SCAN (GitHub Actions security), K8S_POSTURE,
 #                           API_FUZZ (needs SEC_API_SPEC=<openapi url>), EXPOSURE (needs SEC_EXPOSURE_TARGETS=<urls/hosts you own>), REPO_POSTURE (needs GITHUB_TOKEN)
-#   --partial               an intentionally incomplete local run (secscan quick): required tools may be skipped
-#   --publish-latest        send the newest report to the dashboard (needs SEC_DASHBOARD_URL + SECSCAN_DASHBOARD_TOKEN)
-#   --explain               print which tools would run and why, then exit (secscan config show)
+#   --partial               an intentionally incomplete local run (warden quick): required tools may be skipped
+#   --publish-latest        send the newest report to the dashboard (needs SEC_DASHBOARD_URL + WARDEN_DASHBOARD_TOKEN)
+#   --explain               print which tools would run and why, then exit (warden config show)
 #   --exclude a,b           SEC_EXCLUDE_PATHS  path globs whose code findings (not dependency CVEs) are left out of the result, e.g. vendor/**,legacy/**
 #   --no-semgrep            (same as --skip semgrep)
 #   --sonar                 SEC_SONAR=1   SonarQube (needs SONAR_HOST_URL + SONAR_TOKEN env)   --sonar-key KEY  SEC_SONAR_KEY
@@ -86,12 +86,12 @@ load_config() {
 [ -f "$HERE/configs/central.env" ] && load_config "$HERE/configs/central.env"
 if [ -z "${SONAR_HOST_URL:-}" ] && [ -n "${SEC_SONAR_HOST_URL:-}" ]; then export SONAR_HOST_URL="$SEC_SONAR_HOST_URL"; fi
 : "${SEC_PRESET:=starter}" "${SEC_PROFILE:=auto}" "${SEC_SKIP:=}" "${SEC_DEPCHECK_NOUPDATE:=0}" "${SEC_EXCLUDE_PATHS:=}" "${SEC_API_SPEC:=}" "${SEC_API_NETWORK:=}" "${SEC_EXPOSURE_TARGETS:=}" "${SEC_FUZZ_EXAMPLES:=40}"
-# `secscan disable --until DATE --reason ...` switches scanning off for a limited time only; after DATE it resumes by itself
+# `warden disable --until DATE --reason ...` switches scanning off for a limited time only; after DATE it resumes by itself
 if [ -n "${SEC_DISABLED_UNTIL:-}" ]; then
   if [[ "$SEC_DISABLED_UNTIL" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && ! [[ "$SEC_DISABLED_UNTIL" < "$(date +%F)" ]]; then
     echo "!! SECURITY SCANNING IS DISABLED for this repository until $SEC_DISABLED_UNTIL (see .security/config.env). Nothing was scanned." >&2; exit 0
   fi
-  echo "note: SEC_DISABLED_UNTIL=$SEC_DISABLED_UNTIL has passed or is invalid; scanning is back on. Remove the line, or renew with: secscan disable --until DATE --reason TEXT" >&2
+  echo "note: SEC_DISABLED_UNTIL=$SEC_DISABLED_UNTIL has passed or is invalid; scanning is back on. Remove the line, or renew with: warden disable --until DATE --reason TEXT" >&2
 fi
 # the preset supplies the defaults for enforce/gate; anything set on the command line, in the environment or in config.env wins
 POLICY="$HERE/configs/policies/policy.json"
@@ -107,7 +107,7 @@ skip() { [[ ",$SEC_SKIP," == *",$1,"* ]]; }
 # reports go next to the repo's settings when it has a .security folder; a framework checkout keeps them under reports/; an installed package uses the user cache
 if [ "$KIT_MODE" = 1 ] || [ -d "$REPO/.security" ]; then REPORT_BASE="$REPO/.security/reports"
 elif [ -d "$HERE/.git" ]; then REPORT_BASE="$HERE/reports/$NAME"
-else REPORT_BASE="${XDG_CACHE_HOME:-$HOME/.cache}/secscan/reports/$NAME"; fi
+else REPORT_BASE="${XDG_CACHE_HOME:-$HOME/.cache}/warden/reports/$NAME"; fi
 if [ "$PUBLISH_LATEST" = 1 ]; then
   [ -f "$REPORT_BASE/latest/summary.json" ] || { echo "no report to publish yet: run a scan first" >&2; exit 1; }
   [ -n "${SEC_DASHBOARD_URL:-}" ] || { echo "SEC_DASHBOARD_URL is not set (config.env or configs/central.env); see docs/dashboard.md" >&2; exit 2; }
@@ -175,7 +175,7 @@ if [ "$EXPLAIN" = 1 ]; then
   echo "preset=$SEC_PRESET enforce=$SEC_ENFORCE gate=$SEC_GATE stacks=${PROFILES[*]} (config: ${SEC_DIR}/config.env)"; printf '%s' "$PLAN_TXT"
   [ -n "$SEC_EXCLUDE_PATHS" ] && echo "  excluded paths (code findings only): $SEC_EXCLUDE_PATHS"
   echo "  sonarqube url: ${SONAR_HOST_URL:-not set}   token: $([ -n "${SONAR_TOKEN:-}" ] && echo set || echo 'not set (CI secret SONAR_TOKEN)')"
-  echo "  dashboard url: ${SEC_DASHBOARD_URL:-not set}   token: $([ -n "${SECSCAN_DASHBOARD_TOKEN:-}" ] && echo set || echo 'not set (CI secret SECSCAN_DASHBOARD_TOKEN)')"
+  echo "  dashboard url: ${SEC_DASHBOARD_URL:-not set}   token: $([ -n "${WARDEN_DASHBOARD_TOKEN:-}" ] && echo set || echo 'not set (CI secret WARDEN_DASHBOARD_TOKEN)')"
   exit "$CONFIG_ERR"
 fi
 [ "$CONFIG_ERR" = 0 ] || exit 2
@@ -408,7 +408,7 @@ run_redteam() {
   log "AI red team against $SEC_REDTEAM_URL (real attack probes: only against QA/UAT you own)"
   ensure_scanner_image || return
   TOOLS+=(redteam)
-  local contract="${SEC_REDTEAM_CONTRACT:-$SEC_DIR/redteam.json}" net=() canary=() name="secscan-rt-$$"
+  local contract="${SEC_REDTEAM_CONTRACT:-$SEC_DIR/redteam.json}" net=() canary=() name="warden-rt-$$"
   if [ -f "$contract" ]; then contract="$(readlink -f "$contract")"; else echo "no contract at $contract (see docs/agentic-redteam.md): using defaults"; contract=/dev/null; fi
   if [ -n "$SEC_REDTEAM_NETWORK" ]; then net=(--network "$SEC_REDTEAM_NETWORK"); canary=(--canary-host "$name"); else net=(--network host); fi
   docker run --rm --name "$name" "${net[@]}" -e REDTEAM_TOKEN -e REDTEAM_TOKEN_B -v "$HERE/scripts/redteam.py:/rt/redteam.py:ro" \
@@ -438,7 +438,7 @@ run_sonar() {
 # Authenticated scans: ZAP_AUTH_TOKEN (sent as "Authorization: Bearer <token>") or ZAP_AUTH_HEADER ("Name: value"), both CI secrets.
 # They reach the container through the environment (never the command line) and become a ZAP replacer rule on every request.
 ZAP_WRAP='hn=""; if [ -n "$ZAP_AUTH_TOKEN" ]; then hn=Authorization; hv="Bearer $ZAP_AUTH_TOKEN"; elif [ -n "$ZAP_AUTH_HEADER" ]; then hn="${ZAP_AUTH_HEADER%%:*}"; hv="${ZAP_AUTH_HEADER#*:}"; hv="${hv# }"; fi
-if [ -n "$hn" ]; then hv="${hv// /\\ }"; zo="-config replacer.full_list(0).description=secscan-auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=$hn -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$hv"; exec "$@" -z "$zo"; fi
+if [ -n "$hn" ]; then hv="${hv// /\\ }"; zo="-config replacer.full_list(0).description=warden-auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=$hn -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$hv"; exec "$@" -z "$zo"; fi
 exec "$@"'
 run_zap() {
   log "OWASP ZAP $SEC_ZAP_MODE scan against $SEC_ZAP_URL (authorised, non-production targets only)$([ -n "${ZAP_AUTH_TOKEN:-}${ZAP_AUTH_HEADER:-}" ] && echo ', authenticated')"
@@ -507,5 +507,5 @@ python3 -I "$HERE/scripts/gate.py" "${ARGS[@]}" $ENFORCE
 RC=$?
 if [ -n "${SEC_DASHBOARD_URL:-}" ] && [ -f "$OUT/summary.json" ]; then python3 -I "$HERE/scripts/publish.py" --report "$OUT" --root "$REPO" --url "$SEC_DASHBOARD_URL" || true; fi
 echo "   report: $OUT/summary.html   (also summary.md, results.sarif, raw/)"
-[ "$RC" = 0 ] && [ -z "$ENFORCE" ] && grep -q '"result": "FAIL' "$OUT/summary.json" 2>/dev/null && echo "   report-only mode: the gate WOULD have failed. Fix the findings, or baseline legacy ones (secscan baseline), then switch the preset: secscan config set SEC_PRESET standard."
+[ "$RC" = 0 ] && [ -z "$ENFORCE" ] && grep -q '"result": "FAIL' "$OUT/summary.json" 2>/dev/null && echo "   report-only mode: the gate WOULD have failed. Fix the findings, or baseline legacy ones (warden baseline), then switch the preset: warden config set SEC_PRESET standard."
 exit $RC

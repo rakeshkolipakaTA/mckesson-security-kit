@@ -11,7 +11,7 @@ TPL = os.path.join(ROOT, "modes", "per-project", "templates")
 
 
 def init(repo, *args):
-    r = subprocess.run([os.path.join(ROOT, "scripts", "secscan"), "init", repo, "--vendor", *args], capture_output=True, text=True)
+    r = subprocess.run([os.path.join(ROOT, "scripts", "warden"), "init", repo, "--vendor", *args], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr + r.stdout
     return r.stdout
 
@@ -62,7 +62,7 @@ def test_ci_templates_are_installed_and_parse():
 
 def test_every_workflow_template_pins_actions_and_does_not_persist_credentials():
     """The kit's own scanner (zizmor) flags unpinned actions, persisted checkout credentials and inline ${{ vars }} in scripts: the files
-    `secscan init` writes into a repo must pass it, or a brand-new repo fails its first scan."""
+    `warden init` writes into a repo must pass it, or a brand-new repo fails its first scan."""
     names = sorted(f for f in os.listdir(TPL) if f.startswith("github-actions-") and f.endswith(".yml")) + ["../../../.github/workflows/security-scan-reusable.yml"]
     for name in names:
         text = open(os.path.join(TPL, name)).read()

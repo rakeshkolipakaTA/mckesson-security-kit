@@ -1,4 +1,4 @@
-# McKesson Security Scanning Framework (v1)
+# Warden: McKesson Security Scanning Framework (v1)
 
 Reference implementation of a central DevSecOps scanning plan: one framework, tools for every layer, templates for GitHub Actions / Jenkins / Azure DevOps,
 and guides written so that **a developer with no DevOps help can onboard a repo in about 10 minutes**.
@@ -8,11 +8,11 @@ and guides written so that **a developer with no DevOps help can onboard a repo 
 ```bash
 pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.0"   # once, in a venv (team lead)
 cd your-repo
-secscan init                                 # add scanning (+ GitHub workflow); report-only preset "starter"
-.security/secscan doctor                     # check Docker/network
-.security/secscan scan                       # first scan, never breaks your build
-.security/secscan config show                # what runs and why; settings live in .security/config.env
-.security/secscan open                       # HTML report
+warden init                                 # add scanning (+ GitHub workflow); report-only preset "starter"
+.security/warden doctor                     # check Docker/network
+.security/warden scan                       # first scan, never breaks your build
+.security/warden config show                # what runs and why; settings live in .security/config.env
+.security/warden open                       # HTML report
 ```
 Teammates and CI install nothing: the repo pins the version and the launcher fetches it. Settings: [docs/configuration.md](docs/configuration.md).
 
@@ -26,7 +26,7 @@ _AI agents:_ see [docs/agentic-security.md](docs/agentic-security.md): agent-spe
 | SCA | pip-audit (Python), `npm audit` (Node), Trivy (all, incl. Java), OWASP Dependency-Check (optional, Java) |
 | Container / IaC | Trivy (Dockerfile + built image) |
 | DAST | OWASP ZAP (baseline / api / full, QA only) |
-| **AI agents** | 16 agent Semgrep rules, inventory + model-registry scan (models, endpoints, tools, MCP servers, prompt secrets), `modelscan` (malicious model files), red-team probes (`secscan redteam`), `agentsec` runtime library; DeepTeam/promptfoo templates |
+| **AI agents** | 16 agent Semgrep rules, inventory + model-registry scan (models, endpoints, tools, MCP servers, prompt secrets), `modelscan` (malicious model files), red-team probes (`warden redteam`), `agentsec` runtime library; DeepTeam/promptfoo templates |
 | Gate + reports | `scripts/gate.py`: dedupe across tools, baseline, exceptions, severity policy; HTML, markdown, JSON, SARIF |
 
 ## What we test
@@ -63,11 +63,11 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | **Team leads** | [configuration (presets, tool switches)](docs/configuration.md) · [setup & integration (Sonar URL, tokens, CI)](docs/integrations.md) · [dashboard](docs/dashboard.md) · [onboarding checklist](docs/onboarding-checklist.md) · [policy](docs/policy.md) |
 | **Platform / security team** | [setup & integration](docs/integrations.md) · [dashboard](docs/dashboard.md) · [platform setup](docs/platform-setup.md) · [central mode](docs/central-mode.md) · [per-project mode](docs/per-project-mode.md) · [tools](docs/tools.md) · [SonarQube](docs/sonar-setup.md) |
 | **AI agents** | [agentic security overview + coverage map](docs/agentic-security.md) · [red teaming](docs/agentic-redteam.md) · [agentsec runtime library](docs/agentic-runtime-library.md) |
-| **Evidence** | [point-of-view deck (HTML, cyber security and VAPT)](docs/secscan-pov-presentation.html) · [what we test, by category](docs/test-coverage.md) · [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
+| **Evidence** | [point-of-view deck (HTML, cyber security and VAPT)](docs/warden-pov-presentation.html) · [what we test, by category](docs/test-coverage.md) · [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
 
 ## Repository layout
 ```
-scripts/      secscan (CLI) · scan.sh (runner) · gate.py (policy + reports) · agent_scan.py · redteam.py · e2e-agent.sh · selftest.sh · test-onboarding.sh · test_gate.py · aggregate.py · sonar-bootstrap.sh · depcheck-update.sh
+scripts/      warden (CLI) · scan.sh (runner) · gate.py (policy + reports) · agent_scan.py · redteam.py · e2e-agent.sh · selftest.sh · test-onboarding.sh · test_gate.py · aggregate.py · sonar-bootstrap.sh · depcheck-update.sh
 configs/      tool configs and policies/policy.json (severity gates, SLAs)
 docker/       scanner images (python, node) · SonarQube compose
 modes/        per-project kit installer + CI templates

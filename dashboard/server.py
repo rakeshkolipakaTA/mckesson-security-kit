@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""secscan dashboard: one place to see every repo's latest security scan. Standard library only (http.server + sqlite3).
+"""Warden dashboard: one place to see every repo's latest security scan. Standard library only (http.server + sqlite3).
 
 CI publishes each scan to POST /api/ingest (Bearer DASHBOARD_INGEST_TOKEN); people view it with HTTP basic auth.
-Env: DASHBOARD_PASSWORD (required), DASHBOARD_INGEST_TOKEN (required), DASHBOARD_USER=secscan, DASHBOARD_DB=/data/dashboard.db,
+Env: DASHBOARD_PASSWORD (required), DASHBOARD_INGEST_TOKEN (required), DASHBOARD_USER=warden, DASHBOARD_DB=/data/dashboard.db,
      DASHBOARD_PORT=8090, DASHBOARD_BIND=0.0.0.0, SONAR_PUBLIC_URL (adds a SonarQube link), STALE_DAYS=14, KEEP_SCANS=100
      SLA: per-severity days come with each scan (policy.json sla_days); DASHBOARD_SLA_DAYS="CRITICAL=3,HIGH=14,MEDIUM=60,LOW=90" is the fallback
      Alerts (optional): DASHBOARD_ALERT_WEBHOOK (Slack/Teams-compatible), DASHBOARD_ALERT_MIN=critical|high (default critical),
@@ -35,7 +35,7 @@ FAILS = {}  # ip -> (count, first_ts): slows password guessing
 
 
 def cfg():
-    c = dict(user=os.environ.get("DASHBOARD_USER", "secscan"), password=os.environ.get("DASHBOARD_PASSWORD", ""),
+    c = dict(user=os.environ.get("DASHBOARD_USER", "warden"), password=os.environ.get("DASHBOARD_PASSWORD", ""),
              token=os.environ.get("DASHBOARD_INGEST_TOKEN", ""), db=os.environ.get("DASHBOARD_DB", "/data/dashboard.db"),
              stale=int(os.environ.get("STALE_DAYS", "14")), keep=int(os.environ.get("KEEP_SCANS", "100")),
              sonar=os.environ.get("SONAR_PUBLIC_URL", ""), sla=parse_sla(os.environ.get("DASHBOARD_SLA_DAYS", "")),
@@ -211,11 +211,11 @@ def send_alert(c, repo, branch, events):
     if not url.startswith(("http://", "https://")):
         return
     link = f" {c['public']}/repo/{quote(repo, safe='/')}" if c.get("public") else ""
-    text = f"[secscan] {repo} ({branch}): " + "; ".join(events) + link
+    text = f"[warden] {repo} ({branch}): " + "; ".join(events) + link
 
     def go():
         try:
-            req = urllib.request.Request(url, data=json.dumps({"text": text}).encode(), method="POST", headers={"Content-Type": "application/json", "User-Agent": "secscan-dashboard"})
+            req = urllib.request.Request(url, data=json.dumps({"text": text}).encode(), method="POST", headers={"Content-Type": "application/json", "User-Agent": "warden-dashboard"})
             urllib.request.urlopen(req, timeout=5).read()
         except Exception as ex:   # an unreachable chat server must never affect scanning or ingest
             sys.stderr.write(f"alert not delivered: {type(ex).__name__}\n")
@@ -312,7 +312,7 @@ def spark(vals, w=90, h=22):
 def page(title, body, c, nonce, user=""):
     son = f'<a href="{e(c["sonar"])}" target="_blank" rel="noopener">SonarQube</a>' if c["sonar"] else ""
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(title)}</title>'
-            f'<style nonce="{nonce}">{CSS}</style></head><body><header><b>secscan</b><a href="/">Portfolio</a>{son}<span class="sp"></span><span class="mut">{e(user)}</span></header>'
+            f'<style nonce="{nonce}">{CSS}</style></head><body><header><b>Warden</b><a href="/">Portfolio</a>{son}<span class="sp"></span><span class="mut">{e(user)}</span></header>'
             f'<main>{body}</main><script nonce="{nonce}">{JS}</script></body></html>')
 
 
@@ -349,7 +349,7 @@ def portfolio(con, c):
                    f'<td class="n{" CRITICAL" if st["overdue"] else ""}" data-v="{st["overdue"]}">{st["overdue"]}{sla_b}</td><td class="n" data-v="{st["oldest"]}">{st["oldest"] if st["overdue"] else "-"}</td>'
                    f'<td class="n{" STALE" if r["tools_ok"] < r["tools_total"] else ""}" data-v="{r["tools_ok"] - r["tools_total"]}">{cov}</td><td>{e(r["preset"] or "-")}</td><td>{spark(hist)}</td></tr>')
     if not trs:
-        trs = ['<tr><td colspan="12" class="mut">No scans published yet. See docs/dashboard.md: set SEC_DASHBOARD_URL and the SECSCAN_DASHBOARD_TOKEN secret in CI.</td></tr>']
+        trs = ['<tr><td colspan="12" class="mut">No scans published yet. See docs/dashboard.md: set SEC_DASHBOARD_URL and the WARDEN_DASHBOARD_TOKEN secret in CI.</td></tr>']
     return (f'<h1>Portfolio</h1><div class="sub">Latest scan per repository (main/master when available). Updated live as CI publishes.</div><div class="tiles">{t}</div>'
             '<div class="bar"><input id="q" data-filter="pt" placeholder="Filter repositories..." aria-label="Filter repositories"></div><div class="tw">'
             '<table class="s" id="pt"><thead><tr><th>Repository</th><th>Branch</th><th>Last scan</th><th>Gate</th><th class="n">Critical</th><th class="n">High</th>'
@@ -425,7 +425,7 @@ def repo_page(con, c, repo, branch):
 
 # ---------------------------------------------------------------- HTTP
 class H(BaseHTTPRequestHandler):
-    server_version = "secscan-dashboard"
+    server_version = "warden-dashboard"
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *a):
@@ -460,7 +460,7 @@ class H(BaseHTTPRequestHandler):
             return False
         h = self.headers.get("Authorization", "")
         if not h:   # a browser's first request carries no credentials: ask for them, but do not count it as a failed guess
-            self._send(401, "login required", "text/plain", {"WWW-Authenticate": 'Basic realm="secscan dashboard", charset="UTF-8"'})
+            self._send(401, "login required", "text/plain", {"WWW-Authenticate": 'Basic realm="warden dashboard", charset="UTF-8"'})
             return False
         ok = False
         if h.startswith("Basic "):
@@ -473,7 +473,7 @@ class H(BaseHTTPRequestHandler):
             FAILS.pop(ip, None)
             return True
         FAILS[ip] = (cnt + 1, first)
-        self._send(401, "login required", "text/plain", {"WWW-Authenticate": 'Basic realm="secscan dashboard", charset="UTF-8"'})
+        self._send(401, "login required", "text/plain", {"WWW-Authenticate": 'Basic realm="warden dashboard", charset="UTF-8"'})
         return False
 
     def do_GET(self):
@@ -498,11 +498,11 @@ class H(BaseHTTPRequestHandler):
                 its = sla_rows(con.execute("SELECT * FROM finding_age WHERE repo=? AND branch=?", (repo, last["branch"])).fetchall(), sla)
                 return self._send(200, json.dumps([dict(fingerprint=i["fp"], severity=i["severity"], age_days=i["age"], sla_days=i["sla"]) for i in its if i["overdue"]]), "application/json")
             if u.path == "/":
-                return self._html(200, "secscan portfolio", portfolio(con, self.server.c))
+                return self._html(200, "warden portfolio", portfolio(con, self.server.c))
             if u.path.startswith("/repo/"):
                 q = dict(x.split("=", 1) for x in u.query.split("&") if "=" in x)
                 body = repo_page(con, self.server.c, unquote(u.path[6:]), unquote(q.get("branch", "")))
-                return self._html(200, "secscan repo", body) if body else self._html(404, "not found", "<h1>Not found</h1><p>No scans for that repository.</p>")
+                return self._html(200, "warden repo", body) if body else self._html(404, "not found", "<h1>Not found</h1><p>No scans for that repository.</p>")
             if u.path == "/api/repos":
                 rows = [{k: r[k] for k in ("repo", "branch", "created", "result", "crit", "high", "med", "low", "new_ch", "tools_ok", "tools_total", "preset")} for r in primary_rows(con)]
                 return self._send(200, json.dumps(rows), "application/json")
@@ -557,7 +557,7 @@ def main():
             time.sleep(3600)
     if c["webhook"]:
         threading.Thread(target=stale_loop, daemon=True).start()
-    print(f"secscan dashboard on {srv.server_address[0]}:{srv.server_address[1]} (db {c['db']})", flush=True)
+    print(f"warden dashboard on {srv.server_address[0]}:{srv.server_address[1]} (db {c['db']})", flush=True)
     srv.serve_forever()
 
 

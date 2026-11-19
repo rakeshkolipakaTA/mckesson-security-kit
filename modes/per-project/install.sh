@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Add the McKesson security kit to ONE repository (per-project mode).
-#   secscan init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor] [--source SRC]
-# Default (installed with pip): THIN - commits only config + CI + a version pin (secscan.lock); the engine is installed from the pin.
+#   warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor] [--source SRC]
+# Default (installed with pip): THIN - commits only config + CI + a version pin (warden.lock); the engine is installed from the pin.
 # --vendor (default when run from a framework checkout): copies the whole engine into .security/kit (works offline).
 # Safe to re-run (= upgrade): refreshes generated files, never overwrites your config, exceptions or baseline.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T="$HERE/modes/per-project/templates"
-REPO="." CI=auto PRESET="" VENDOR="" SOURCE="${SECSCAN_SOURCE:-}"
+REPO="." CI=auto PRESET="" VENDOR="" SOURCE="${WARDEN_SOURCE:-}"
 while [ $# -gt 0 ]; do
   case "$1" in --ci) CI="${2:?--ci needs github|jenkins|azure|all|none}"; shift 2;; --preset) PRESET="${2:?--preset needs starter|standard|strict}"; shift 2;;
     --vendor) VENDOR=1; shift;; --thin) VENDOR=0; shift;; --source) SOURCE="${2:?--source needs a pip source}"; shift 2;; -h|--help) sed -n '2,7p' "$0"; exit 0;; -*) echo "unknown option $1" >&2; exit 2;; *) REPO="$1"; shift;; esac
 done
-[ -d "${REPO:-}" ] || { echo "usage: secscan init [repo-path] [--ci github|jenkins|azure|all|none] [--preset ...] [--vendor]" >&2; exit 2; }
+[ -d "${REPO:-}" ] || { echo "usage: warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset ...] [--vendor]" >&2; exit 2; }
 REPO="$(cd "$REPO" && pwd)"; S="$REPO/.security"; KIT="$S/kit"
 case "$CI" in auto|github|jenkins|azure|all|none) ;; *) echo "--ci must be github|jenkins|azure|all|none" >&2; exit 2;; esac
 if [ "$CI" = auto ]; then
@@ -24,31 +24,31 @@ fi
 
 case "$PRESET" in ""|starter|standard|strict) ;; *) echo "--preset must be starter|standard|strict" >&2; exit 2;; esac
 PROFILES="$("$HERE/scripts/scan.sh" "$REPO" --print-profiles)"
-UPGRADE=0; [ -d "$KIT" ] || [ -f "$S/secscan.lock" ] && UPGRADE=1
-# mode: an existing repo keeps its mode; otherwise thin when installed with pip (SECSCAN_VERSION is set by the pip entry point), vendored from a checkout
+UPGRADE=0; [ -d "$KIT" ] || [ -f "$S/warden.lock" ] && UPGRADE=1
+# mode: an existing repo keeps its mode; otherwise thin when installed with pip (WARDEN_VERSION is set by the pip entry point), vendored from a checkout
 if [ -z "$VENDOR" ]; then
-  if [ -d "$KIT" ]; then VENDOR=1; elif [ -f "$S/secscan.lock" ] && grep -q '^mode=thin' "$S/secscan.lock"; then VENDOR=0; elif [ -n "${SECSCAN_VERSION:-}" ]; then VENDOR=0; else VENDOR=1; fi
+  if [ -d "$KIT" ]; then VENDOR=1; elif [ -f "$S/warden.lock" ] && grep -q '^mode=thin' "$S/warden.lock"; then VENDOR=0; elif [ -n "${WARDEN_VERSION:-}" ]; then VENDOR=0; else VENDOR=1; fi
 fi
-VERSION_NOW="${SECSCAN_VERSION:-$(cat "$HERE/VERSION" 2>/dev/null || echo local)}"
+VERSION_NOW="${WARDEN_VERSION:-$(cat "$HERE/VERSION" 2>/dev/null || echo local)}"
 
 # 1) engine
 mkdir -p "$S/ci"
 if [ "$VENDOR" = 1 ]; then
 rm -rf "$KIT"; mkdir -p "$KIT/scripts" "$KIT/docker"
 cp "$HERE/versions.env" "$KIT/"
-cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/secscan" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$KIT/scripts/"
+cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/warden" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$KIT/scripts/"
 mkdir -p "$KIT/agentic" && cp -r "$HERE/agentic/agentsec" "$KIT/agentic/agentsec" && find "$KIT/agentic" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$HERE/configs" "$KIT/configs"
 cp -r "$HERE/docker/scanner" "$HERE/docker/scanner-node" "$KIT/docker/"
 echo "kit $(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || echo local) $(date +%Y-%m-%d)" > "$KIT/VERSION"
 chmod +x "$KIT/scripts/"*
-printf '#!/usr/bin/env bash\nexec "$(dirname "$(readlink -f "$0")")/kit/scripts/secscan" "$@"\n' > "$S/secscan"; chmod +x "$S/secscan"
-printf '# written by secscan init - commit this file\nversion=%s\nmode=vendored\n' "$VERSION_NOW" > "$S/secscan.lock"
+printf '#!/usr/bin/env bash\nexec "$(dirname "$(readlink -f "$0")")/kit/scripts/warden" "$@"\n' > "$S/warden"; chmod +x "$S/warden"
+printf '# written by warden init - commit this file\nversion=%s\nmode=vendored\n' "$VERSION_NOW" > "$S/warden.lock"
 else
   rm -rf "$KIT"
-  [ -n "$SOURCE" ] || SOURCE="mckesson-secscan==$VERSION_NOW"
-  cp "$T/secscan-shim.sh" "$S/secscan"; chmod +x "$S/secscan"
-  printf '# written by secscan init - commit this file. CI and teammates install exactly this version.\nversion=%s\nsource=%s\nmode=thin\n' "$VERSION_NOW" "$SOURCE" > "$S/secscan.lock"
+  [ -n "$SOURCE" ] || SOURCE="warden-kit==$VERSION_NOW"
+  cp "$T/warden-shim.sh" "$S/warden"; chmod +x "$S/warden"
+  printf '# written by warden init - commit this file. CI and teammates install exactly this version.\nversion=%s\nsource=%s\nmode=thin\n' "$VERSION_NOW" "$SOURCE" > "$S/warden.lock"
 fi
 
 # 2) your files (created once, never overwritten)
@@ -87,7 +87,7 @@ find_dirs() {   # directories (as "/sub/dir", "/" for the root) holding a file t
 uses_github() { want github || [ -d "$REPO/.github" ] || git -C "$REPO" remote -v 2>/dev/null | grep -q 'github\.com'; }
 if uses_github && [ ! -e "$REPO/.github/dependabot.yml" ] && [ ! -e "$REPO/.github/dependabot.yaml" ]; then
   mkdir -p "$REPO/.github"; dep="$REPO/.github/dependabot.yml"
-  { echo "# Written by secscan init (change freely: it is yours now). Opens weekly pull requests that update vulnerable / outdated dependencies."
+  { echo "# Written by warden init (change freely: it is yours now). Opens weekly pull requests that update vulnerable / outdated dependencies."
     echo "# cooldown = ignore versions published in the last 7 days (a freshly published malicious release is usually caught within days). Security updates ignore it."
     echo "# Alternative: Renovate, see .security/ci/renovate.json."; echo "version: 2"; echo "updates:"
     emit() { printf '  - package-ecosystem: "%s"\n    directory: "%s"\n    schedule:\n      interval: "weekly"\n    cooldown:\n      default-days: 7\n    open-pull-requests-limit: 5\n' "$1" "$2"; }
@@ -106,7 +106,7 @@ if [ ! -e "$REPO/.vscode/settings.json" ]; then mkdir -p "$REPO/.vscode"; cp "$T
 echo
 echo "Security kit $([ $UPGRADE = 1 ] && echo upgraded || echo installed) in $S"
 echo "  detected stack : $PROFILES"
-echo "  engine         : $([ "$VENDOR" = 1 ] && echo "vendored in .security/kit (works offline)" || echo "thin, pinned to secscan $VERSION_NOW in .security/secscan.lock")"
+echo "  engine         : $([ "$VENDOR" = 1 ] && echo "vendored in .security/kit (works offline)" || echo "thin, pinned to warden $VERSION_NOW in .security/warden.lock")"
 echo "  preset         : $(grep -m1 '^SEC_PRESET=' "$S/config.env" | cut -d= -f2) (set in .security/config.env; 'starter' = report-only, scans never fail your build yet)"
 [ -n "$INSTALLED" ] && echo "  CI added       : $INSTALLED (GitHub Actions, report-only)"
 [ -n "$EXTRA" ] && echo "  also added     :$EXTRA (only when missing; they are yours now)"
@@ -115,8 +115,8 @@ cat <<NEXT
 
 Next steps (about 10 minutes):
   1. cd "$REPO"
-  2. .security/secscan doctor        # checks Docker + network, tells you exactly what to fix
-  3. .security/secscan scan          # first scan; then:  .security/secscan open
+  2. .security/warden doctor        # checks Docker + network, tells you exactly what to fix
+  3. .security/warden scan          # first scan; then:  .security/warden open
   4. git add .security $([ -n "$INSTALLED$EXTRA" ] && echo .github .vscode) && git commit -m "Add security scanning (report-only)"
-Later: fix findings or run '.security/secscan baseline' for legacy ones, then switch the preset: .security/secscan config set SEC_PRESET standard
+Later: fix findings or run '.security/warden baseline' for legacy ones, then switch the preset: .security/warden config set SEC_PRESET standard
 NEXT

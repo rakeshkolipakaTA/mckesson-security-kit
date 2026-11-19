@@ -5,11 +5,11 @@
 stage('Security scan') {
     steps {
         // Remove withCredentials if you do not use SonarQube. Create the credential 'sonar-token' (Secret text).
-        // Optional: also create a Secret text credential 'secscan-dashboard-token' and add
-        //   string(credentialsId: 'secscan-dashboard-token', variable: 'SECSCAN_DASHBOARD_TOKEN')
+        // Optional: also create a Secret text credential 'warden-dashboard-token' and add
+        //   string(credentialsId: 'warden-dashboard-token', variable: 'WARDEN_DASHBOARD_TOKEN')
         // inside withCredentials([...]) to publish each result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env).
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-            sh '.security/secscan scan'
+            sh '.security/warden scan'
         }
     }
     post {
@@ -25,13 +25,13 @@ stage('Security scan') {
 stage('Image security gate') {
     steps {
         sh 'docker build -t "$IMAGE" .'                                  // EDIT: your image variable
-        sh '.security/secscan gate --gate release --image "$IMAGE"'      // fails the build on Critical/High
+        sh '.security/warden gate --gate release --image "$IMAGE"'      // fails the build on Critical/High
     }
 }
 
 // 3) After the QA deployment (QA/UAT only, never prod) --------------------------------------------
 stage('DAST (QA)') {
     steps {
-        sh '.security/secscan scan --zap-url "$QA_URL" --zap-mode baseline'
+        sh '.security/warden scan --zap-url "$QA_URL" --zap-mode baseline'
     }
 }

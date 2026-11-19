@@ -3,7 +3,7 @@
 
   publish.py --report <report-dir> [--url URL] [--root <repo>] [--repo NAME] [--strict]
 
-URL comes from --url / SEC_DASHBOARD_URL (not secret); the token from SECSCAN_DASHBOARD_TOKEN (a CI secret, never a file).
+URL comes from --url / SEC_DASHBOARD_URL (not secret); the token from WARDEN_DASHBOARD_TOKEN (a CI secret, never a file).
 A publishing problem is only a warning (exit 0) so the dashboard being down never breaks a build; --strict makes it exit 1.
 Repo / branch / commit / run link are detected from GitHub Actions, Jenkins, Azure DevOps or the local git checkout.
 """
@@ -60,13 +60,13 @@ def main():
     ap.add_argument("--strict", action="store_true")
     a = ap.parse_args()
     fail = (lambda m: (print(f"dashboard: {m}", file=sys.stderr), sys.exit(1 if a.strict else 0)))
-    token = os.environ.get("SECSCAN_DASHBOARD_TOKEN", "")
+    token = os.environ.get("WARDEN_DASHBOARD_TOKEN", "")
     if not a.url.startswith(("http://", "https://")):
         fail("SEC_DASHBOARD_URL must start with http:// or https://")
     if not token:
         in_ci = any(os.environ.get(k) for k in ("CI", "GITHUB_ACTIONS", "JENKINS_URL", "TF_BUILD"))
         if in_ci or a.strict:
-            fail("SECSCAN_DASHBOARD_TOKEN is not set (add it as a CI secret); not publishing")
+            fail("WARDEN_DASHBOARD_TOKEN is not set (add it as a CI secret); not publishing")
         return  # a developer's local scan: publishing is a CI job
     try:
         summary = json.load(open(os.path.join(a.report, "summary.json")))
@@ -80,7 +80,7 @@ def main():
     body = json.dumps({"repo": a.repo or repo or summary.get("target"), "branch": branch, "commit": commit, "run_url": run, "summary": summary,
                        "findings": slim, "findings_total": len(findings)}).encode()
     req = urllib.request.Request(a.url.rstrip("/") + "/api/ingest", data=body, method="POST",
-                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "User-Agent": "secscan-publish"})
+                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "User-Agent": "warden-publish"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             print(f"dashboard: published {a.repo or repo} ({branch}) -> {a.url} [{r.status}]")

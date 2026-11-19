@@ -1,5 +1,5 @@
 # Optional: block commits that contain secrets (about 2 seconds). Merge into .pre-commit-config.yaml and run `pre-commit install`.
-# Alternative without pre-commit:  .security/secscan hook install   (runs a quick scan before every git push)
+# Alternative without pre-commit:  .security/warden hook install   (runs a quick scan before every git push)
 repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

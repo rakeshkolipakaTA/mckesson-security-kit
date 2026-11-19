@@ -9,7 +9,7 @@ A security champion is a developer on each team who is the first point of contac
 | **Review** | second pair of eyes on pull requests that touch authentication, data, AI-agent tools or dependencies (use the [checklist](secure-code-review-checklist.md)) |
 | **Design** | runs a short [threat model](threat-model-template.md) for new features and agents |
 | **Exceptions** | prepares exception requests (reason, expiry) for the team lead and security to approve; reminds the team before they expire |
-| **Teach** | shares one lesson per sprint from a real finding; helps new joiners with `secscan` |
+| **Teach** | shares one lesson per sprint from a real finding; helps new joiners with `warden` |
 | **Escalate** | brings anything unclear, a possible leak or an incident to the security contact straight away ([runbook](incident-response-runbook.md)) |
 | **Improve the kit** | proposes new scanner rules, a better baseline, a probe for an attack the team met |
 

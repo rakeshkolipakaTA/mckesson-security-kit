@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decide which scanners run, and why. Used by scan.sh (and `secscan config show`). Standard library only.
+"""Decide which scanners run, and why. Used by scan.sh (and `warden config show`). Standard library only.
 
   toolplan.py preset  --policy P --preset NAME            -> prints "<enforce> <gate>" defaults of that preset
   toolplan.py plan    --policy P --preset NAME --profiles python,node --modes bandit=off,sonar=on ...
@@ -8,7 +8,7 @@
 
 Tool modes: auto = run when the stack/target fits, on = always run, off = never run.
 Tools the central policy lists as *required* ignore `off` unless a valid, unexpired waiver exists in exceptions.json
-(--partial = an intentionally incomplete local run such as `secscan quick`: required tools may be skipped).
+(--partial = an intentionally incomplete local run such as `warden quick`: required tools may be skipped).
 """
 import argparse
 import datetime as dt

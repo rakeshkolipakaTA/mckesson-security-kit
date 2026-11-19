@@ -1,6 +1,6 @@
 # Reading your report
 
-Open it with `.security/secscan open` (file: `.security/reports/latest/summary.html`). In CI download the **security-report** artifact.
+Open it with `.security/warden open` (file: `.security/reports/latest/summary.html`). In CI download the **security-report** artifact.
 
 ## Top of the page
 - **PASS / FAIL**: whether the gate would block. In report-only mode FAIL does *not* fail your build; it tells you what *would* block once enforcement is on.

@@ -22,11 +22,11 @@ jobs:
       - name: Build image
         run: docker build -t "$IMAGE" .       # EDIT: build context / Dockerfile path if different
       - name: Release security gate (code + dependencies + image)
-        run: .security/secscan gate --gate release --image "$IMAGE"
+        run: .security/warden gate --gate release --image "$IMAGE"
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SECSCAN_DASHBOARD_TOKEN: ${{ secrets.SECSCAN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+          WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
       - name: Show results on the run page
         if: always()
         run: |

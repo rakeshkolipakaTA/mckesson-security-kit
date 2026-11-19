@@ -4,8 +4,8 @@
 |---|---|---|
 | `config.env` | **you** | The settings. Start with `SEC_PRESET=starter` (report-only), switch to `standard` when ready. See docs/configuration.md. |
 | `exceptions.json` | you, with security approval | Time-boxed suppressions of findings you cannot fix now. |
-| `baseline.json` | created by `secscan baseline` | Findings that already existed when you onboarded; only NEW High/Critical ones block. |
-| `secscan` | nobody | The command: `secscan doctor`, `secscan scan`, `secscan gate`, `secscan open`. |
+| `baseline.json` | created by `warden baseline` | Findings that already existed when you onboarded; only NEW High/Critical ones block. |
+| `warden` | nobody | The command: `warden doctor`, `warden scan`, `warden gate`, `warden open`. |
 | `kit/` | nobody (generated) | The pinned scanner kit. Upgrade by re-running `init` from the framework repo. |
 | `ci/` | copy once | Ready-made pipeline files for Jenkins / Azure DevOps and extras. |
 | `reports/` | nobody (git-ignored) | Scan output. Open `reports/latest/summary.html`. Never commit or share it. |

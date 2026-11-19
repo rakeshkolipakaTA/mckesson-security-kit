@@ -10,7 +10,7 @@ selftest:        ## prove the gate logic (~2 min, needs Docker + internet for th
 dashboard:
 	scripts/aggregate.py
 build-scanner:
-	scripts/secscan pull
+	scripts/warden pull
 e2e-fastapi:     ## build+run the vulnerable FastAPI sample and scan it with every layer incl. ZAP (~6 min)
 	scripts/e2e-fastapi.sh
 test-newtools:  ## real-container test of the newer checks: git history, SBOM, workflows, K8s, fuzzing, exposure, SLA (~3 min)

@@ -1,10 +1,10 @@
 # Jenkins
 
-Requirements: an agent with **Docker** and `bash`/`python3`; outbound access listed by `secscan doctor`.
+Requirements: an agent with **Docker** and `bash`/`python3`; outbound access listed by `warden doctor`.
 
 ## 1. Add the kit
 ```bash
-scripts/secscan init /path/to/repo --ci jenkins     # from the framework folder
+scripts/warden init /path/to/repo --ci jenkins     # from the framework folder
 git add .security && git commit -m "Add security scanning (report-only)"
 ```
 This creates `.security/ci/Jenkinsfile.security` (stages) and `.security/ci/securityScan.groovy` (shared-library step).
@@ -13,7 +13,7 @@ This creates `.security/ci/Jenkinsfile.security` (stages) and `.security/ci/secu
 Copy stage 1 from `.security/ci/Jenkinsfile.security`:
 ```groovy
 stage('Security scan') {
-    steps { sh '.security/secscan scan' }
+    steps { sh '.security/warden scan' }
     post { always { archiveArtifacts artifacts: '.security/reports/20*/summary.html, .security/reports/20*/summary.md', allowEmptyArchive: true } }
 }
 ```

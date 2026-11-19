@@ -15,7 +15,7 @@ from agentsec.secrets import RotatingSecret, SecretError, SecretNotFound, VaultK
 
 IMAGE = os.environ.get("VAULT_TEST_IMAGE", "hashicorp/vault:1.18")
 SUFFIX = pysecrets.token_hex(4)
-NAME, NET = f"secscan-vault-test-{SUFFIX}", f"secscan-vault-net-{SUFFIX}"
+NAME, NET = f"warden-vault-test-{SUFFIX}", f"warden-vault-net-{SUFFIX}"
 ROOT_TOKEN = "root-" + pysecrets.token_hex(12)          # random per run: nothing reusable
 STATE = {}
 

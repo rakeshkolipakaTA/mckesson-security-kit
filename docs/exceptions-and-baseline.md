@@ -12,7 +12,7 @@ Two tools for two different situations.
 
 ## Baseline (legacy apps)
 ```bash
-.security/secscan baseline      # runs a scan and records every current finding as "existing"
+.security/warden baseline      # runs a scan and records every current finding as "existing"
 git add .security/baseline.json && git commit -m "Security baseline"
 ```
 After that, on pull requests: **new** Critical/High findings block, **existing** ones are tracked but do not block (existing *Critical* still blocks on the `pr` gate; see [policy.md](policy.md)).
