@@ -55,4 +55,4 @@ Status legend: **Verified** = exercised end to end in this repo; **Reference** =
 the vulnerable one fails the gate with 18+ red-team failures, 12+ governance findings and every agent Semgrep rule firing; the hardened one has no agent findings, passes
 all probes except the paraphrased-injection one, and its audit chain verifies; a malicious pickle is flagged CRITICAL.
 **Limits to keep in mind**: the mock LLM is a stand-in, so results prove the *application's* controls (auth, tools, guardrails, egress) and the *harness*, not the robustness of
-any real model to jailbreaks. The registry is an example. Nothing here has been run against a real McKesson agent platform (AgentFlow).
+any real model to jailbreaks. The registry is an example. Nothing here has been run against a real production agent platform.

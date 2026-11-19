@@ -29,6 +29,27 @@ _AI agents:_ see [docs/agentic-security.md](docs/agentic-security.md): agent-spe
 | **AI agents** | 16 agent Semgrep rules, inventory + model-registry scan (models, endpoints, tools, MCP servers, prompt secrets), `modelscan` (malicious model files), red-team probes (`secscan redteam`), `agentsec` runtime library; DeepTeam/promptfoo templates |
 | Gate + reports | `scripts/gate.py`: dedupe across tools, baseline, exceptions, severity policy; HTML, markdown, JSON, SARIF |
 
+## What we test (85 checks in 10 categories)
+Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test-coverage.xlsx)** (Excel) or [docs/test-coverage.md](docs/test-coverage.md). Both are generated from one data file (`tools/coverage_data.py`).
+
+| Category | Question it answers | Checks | Tools |
+|---|---|---|---|
+| Secrets | Is a password, token or key sitting in the code? | 5 | gitleaks, Trivy, Semgrep, agent-scan |
+| Code analysis (SAST) | Does our own code contain insecure patterns? | 4 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
+| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 4 | pip-audit, npm audit, Trivy, Dependency-Check (optional) |
+| Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 3 | Trivy (Dockerfile, Kubernetes/Helm, image) |
+| Dynamic testing (DAST) | Can a running app be attacked from outside? | 3 | OWASP ZAP (baseline, API, full) |
+| AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 27 | 16 Semgrep agent rules, 12 agent-scan checks, modelscan |
+| AI agent: red-team probes | Does a running agent resist real attack attempts? | 20 | 18 deterministic probes; DeepTeam and promptfoo templates |
+| AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 9 | agentsec (9 modules) |
+| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 8 | gate.py, dashboard, reports |
+| Developer workflow | Catches problems on the developer's machine before CI. | 2 | pre-push hook, pre-commit, PR template |
+| **Total** |  | **85** | 14 scanner tools plus the library and gate |
+
+**What cyber security means:** protecting systems, applications and data from unauthorised access, damage or disruption, and being able to detect and recover when something goes wrong (confidentiality, integrity, availability). These scans cover the *application and delivery-pipeline* slice. Network, cloud posture, runtime detection and response, and people and process need other tools and activities; the prioritised list of what to add next is in the Roadmap sheet.
+
+**Coverage of the Agentic Security presentation:** 97 items checked: 33 covered, 44 partial, 20 not covered. Scanning, pipeline gates, red-team probes and the runtime-controls library are covered; platform services (sandbox runtime, identity provider / vault, policy admin UI, runtime detection) and some data and output-integrity items are not. The Presentation coverage sheet lists every item.
+
 ## Documentation
 | For | Read |
 |---|---|
@@ -37,7 +58,7 @@ _AI agents:_ see [docs/agentic-security.md](docs/agentic-security.md): agent-spe
 | **Team leads** | [configuration (presets, tool switches)](docs/configuration.md) · [setup & integration (Sonar URL, tokens, CI)](docs/integrations.md) · [dashboard](docs/dashboard.md) · [onboarding checklist](docs/onboarding-checklist.md) · [policy](docs/policy.md) |
 | **Platform / security team** | [setup & integration](docs/integrations.md) · [dashboard](docs/dashboard.md) · [platform setup](docs/platform-setup.md) · [central mode](docs/central-mode.md) · [per-project mode](docs/per-project-mode.md) · [tools](docs/tools.md) · [SonarQube](docs/sonar-setup.md) |
 | **AI agents** | [agentic security overview + coverage map](docs/agentic-security.md) · [red teaming](docs/agentic-redteam.md) · [agentsec runtime library](docs/agentic-runtime-library.md) |
-| **Evidence** | [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
+| **Evidence** | [what we test, by category](docs/test-coverage.md) · [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
 
 ## Repository layout
 ```
