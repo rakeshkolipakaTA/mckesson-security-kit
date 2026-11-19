@@ -69,7 +69,7 @@ REPO="$(cd "$REPO" && pwd)"; NAME="$(basename "$REPO")"
 SEC_DIR="${SEC_DIR_ARG:-$REPO/.security}"; [ -d "$SEC_DIR" ] && SEC_DIR="$(cd "$SEC_DIR" && pwd)"
 
 # ---- config.env: parsed, never sourced (a pull request must not be able to run code on the scanner) ----
-CONFIG_KEYS=" SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
+CONFIG_KEYS=" SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
 load_config() {
   local line k v
   while IFS= read -r line || [ -n "$line" ]; do
@@ -98,7 +98,7 @@ POLICY="$HERE/configs/policies/policy.json"
 PRESET_OUT="$(python3 -I "$HERE/scripts/toolplan.py" preset --policy "$POLICY" --preset "$SEC_PRESET")" || exit 2
 read -r PRESET_ENFORCE PRESET_GATE <<< "$PRESET_OUT"
 : "${SEC_ENFORCE:=$PRESET_ENFORCE}" "${SEC_GATE:=$PRESET_GATE}"
-: "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}"
+: "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}" "${SEC_SEMGREP_PACKS:=auto}"
 : "${SEC_REDTEAM_URL:=}" "${SEC_REDTEAM_NETWORK:=}" "${SEC_REDTEAM_CONTRACT:=}"
 case "$SEC_GATE" in pr|release) ;; *) echo "SEC_GATE must be pr or release" >&2; exit 2;; esac
 ENFORCE=""; [ "$SEC_ENFORCE" = 1 ] && ENFORCE="--enforce"
@@ -292,6 +292,21 @@ run_semgrep() {
     is python && cfgs+=(--config p/python)
     is node   && cfgs+=(--config p/javascript --config p/typescript --config p/nodejs)
     is java   && cfgs+=(--config p/java)
+    # Extra SAST rule packs (injection, XSS, JWT, insecure transport, CWE Top 25, framework packs). SEC_SEMGREP_PACKS: auto (default) | none | p/a,p/b (replaces the list)
+    local packs=()
+    case "$SEC_SEMGREP_PACKS" in
+      none) ;;
+      auto) packs=(p/security-audit p/cwe-top-25 p/sql-injection p/command-injection p/insecure-transport p/jwt)
+            is python && packs+=(p/flask p/django p/fastapi)
+            is node   && packs+=(p/xss p/expressjs p/react)
+            [ -n "$(find "$REPO" -maxdepth 4 -iname 'Dockerfile*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ] && packs+=(p/dockerfile);;
+      *)    IFS=, read -r -a packs <<<"$SEC_SEMGREP_PACKS";;
+    esac
+    local pk used_packs=(); for pk in "${packs[@]}"; do
+      [[ "$pk" =~ ^[pr]/[A-Za-z0-9._-]+$ ]] || { echo "NOTE: ignored invalid Semgrep pack '$pk' in SEC_SEMGREP_PACKS (expected p/name)" >&2; continue; }
+      cfgs+=(--config "$pk"); used_packs+=("$pk")
+    done
+    log "semgrep extra packs: ${used_packs[*]:-none}"
   fi
   local rmount=()
   if is agent; then cfgs+=(--config /agentic-rules); rmount=(-v "$HERE/configs/semgrep/agentic:/agentic-rules:ro"); fi

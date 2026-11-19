@@ -24,8 +24,8 @@ A check that could not run is shown as **"Did not complete"**, never as clean.
 ## What runs with nothing but GitHub
 | Check | Runs by default? | Notes |
 |---|---|---|
-| Secrets in files and git history (gitleaks) | Yes | Needs full history for the history scan; the generated workflow checks out normally, set `fetch-depth: 0` to scan all history |
-| Code analysis (Semgrep, plus Bandit for Python, ESLint for Node) | Yes | |
+| Secrets in files and git history (gitleaks) | Yes | The generated workflow checks out the full history (`fetch-depth: 0`) so old commits are scanned too |
+| Code analysis (SAST): Semgrep with OWASP Top 10, CWE Top 25, injection, XSS, JWT, framework and Dockerfile rule packs; Bandit (Python); ESLint security (Node) | Yes | Extra packs: `SEC_SEMGREP_PACKS=auto\|none\|p/a,p/b` in `config.env`. Deeper data-flow analysis: optional CodeQL, see below |
 | Dependencies with known vulnerabilities (Trivy, pip-audit, npm audit), licences, SBOM | Yes | |
 | Dockerfile, Terraform, CloudFormation, Kubernetes manifests (Trivy, kubescape) | Yes, when such files exist | |
 | GitHub workflow security (zizmor) | Yes, when workflows exist | |
@@ -37,6 +37,9 @@ A check that could not run is shown as **"Did not complete"**, never as clean.
 | SonarQube | No | Needs a SonarQube **server** (`SONAR_HOST_URL`, `SONAR_TOKEN`); off by default |
 
 Penetration testing by people, and network-level testing, are separate from the pipeline: see [the point-of-view deck](warden-pov-presentation.html).
+
+## Deeper code analysis with CodeQL (optional)
+`warden init` also writes `.security/ci/security-codeql.github.yml`. Copy it to `.github/workflows/codeql.yml` to add GitHub CodeQL (data-flow analysis that follows user input to dangerous calls). Its results go to the Security tab, so it needs a public repository or GitHub Advanced Security. It is not enabled by default.
 
 ## Settings you may want
 | Setting | Where | Effect |

@@ -1,5 +1,10 @@
 # .github/workflows/security-scan.yml  - security scan on every pull request and on main.
 # Starts report-only (SEC_PRESET=starter in .security/config.env). Change it to standard to block PRs: warden config set SEC_PRESET standard.
+# Checks (chosen automatically for your stack; `.security/warden config show` lists them):
+#   Code (SAST)    : Semgrep (OWASP Top 10, injection, XSS, JWT, framework rules; AI-agent rules), Bandit (Python), ESLint security (Node)
+#   Libraries (SCA): Trivy, pip-audit (Python), npm audit (Node), licences, SBOM; Dependency-Check for Java on the strict preset
+#   Also           : secrets (files + git history), Dockerfile / IaC / Kubernetes, GitHub workflows, model files
+#   Optional       : SonarQube (needs a server), CodeQL (see .security/ci/security-codeql.github.yml)
 # No server needed. Results appear in GitHub itself: the run page (summary), the "Files changed" tab (markers on the risky lines) and ONE
 # comment on the pull request that is updated on every push. If you later set SEC_DASHBOARD_URL, each scan is also sent to the dashboard.
 name: security-scan
@@ -23,6 +28,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
+          fetch-depth: 0          # full history, so the secret scan can also see old commits (a shallow checkout skips that check; set 1 on a huge repo)
+      - name: List the checks that will run
+        run: .security/warden config show
       - name: Security scan
         run: .security/warden scan
         env:

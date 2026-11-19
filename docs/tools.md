@@ -1,7 +1,7 @@
 # Tool guide
 | Tool | Purpose | How it runs | Config | Report |
 |---|---|---|---|---|
-| Semgrep 1.185 | Multi-language code analysis (SQL/command injection, SSRF, deserialization, weak crypto, CORS...) with registry rule packs `p/default`, `p/owasp-top-ten` + per-stack packs | pinned image, `--metrics=off` | `SEC_SEMGREP_RULES` for offline/approved rules | `raw/semgrep.json` |
+| Semgrep 1.185 | Multi-language code analysis (SQL/command injection, SSRF, deserialization, weak crypto, CORS...) with registry rule packs `p/default`, `p/security-audit`, `p/cwe-top-25`, injection, JWT and framework packs (`SEC_SEMGREP_PACKS`), `p/owasp-top-ten` + per-stack packs | pinned image, `--metrics=off` | `SEC_SEMGREP_RULES` for offline/approved rules | `raw/semgrep.json` |
 | ESLint 9 + security plugins | JS/TS security rules (`eslint-plugin-security`, `no-unsanitized`) | `mckesson-scanner-node` image | `configs/eslint/eslint.config.mjs` | `raw/eslint.json` |
 | `npm audit` | Node dependency CVEs, one run per `package-lock.json` | `mckesson-scanner-node` image | — | `raw/npm-audit-<n>.json` |
 | Agent Semgrep rules | 16 rules for agent anti-patterns: tool parameter reaching file/network/exec/SQL, fail-open guardrails, unauthenticated agent routes, hardcoded LLM keys, unsafe model loading, dangerous REPL/shell tools, sensitive data in logs, unbounded loops. Each has positive and negative tests | profile `agent` | `configs/semgrep/agentic/` (`agentic.yaml` + `agentic.py` tests) | in `raw/semgrep.json` |

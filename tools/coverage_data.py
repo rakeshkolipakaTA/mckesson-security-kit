@@ -12,6 +12,8 @@ INVENTORY = [
  ("Secrets", "agent-scan AG-PROMPT-001", "Credentials inside prompt / instruction files", "AI agents", "PR / push", V, "Anything the model sees can be made to repeat it"),
  ("Secrets", "agent-scan AG-MCP-004", "Literal secrets in MCP server env config", "AI agents (MCP)", "PR / push", V, ""),
  # ---- SAST
+ ("Code analysis (SAST)", "Semgrep extra packs (security-audit, CWE Top 25, injection, XSS, JWT, framework, Dockerfile)", "Additional insecure patterns beyond the default rules (e.g. XML parsers without defusedxml, unquoted template variables in links)", "python, node, all", "PR / push", V, "SEC_SEMGREP_PACKS: auto / none / custom list; names validated; added 5 findings to 256 on a real app"),
+ ("Code analysis (SAST)", "CodeQL workflow (optional)", "Data-flow analysis from user input to dangerous calls, in the GitHub Security tab", "python, javascript, java, go, ...", "PR / push / weekly", TP, "Template only, not run: needs a public repo or GitHub Advanced Security"),
  ("Code analysis (SAST)", "Semgrep (default + OWASP Top 10 + stack packs)", "Injection, XSS, weak crypto, unsafe deserialisation, SSRF, path traversal, etc.", "python, node, java", "PR / push", V, "Rules fetched from semgrep.dev, or an offline rule dir (SEC_SEMGREP_RULES)"),
  ("Code analysis (SAST)", "Bandit", "Python security issues (subprocess, SQL strings, hardcoded temp paths, weak hashes)", "python", "PR / push", V, "Some rules are noisy (e.g. B608, B108)"),
  ("Code analysis (SAST)", "ESLint security + no-unsanitized (+ TypeScript)", "JS/TS: eval, unsafe regex, DOM sinks, object injection", "node", "PR / push", V, "detect-object-injection is very noisy"),
@@ -165,7 +167,7 @@ SUITES = [
  ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting", 22),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
  ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report", 50),
- ("scripts/test-newtools.sh", "SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP", 22),
+ ("scripts/test-newtools.sh", "SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs", 29),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
  ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),
  ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers (unit)", 16),

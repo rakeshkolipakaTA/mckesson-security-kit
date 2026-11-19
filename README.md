@@ -36,7 +36,7 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | Category | Question it answers | Checks | Tools |
 |---|---|---|---|
 | Secrets | Is a password, token or key sitting in the code? | 6 | gitleaks (tree + git history), Trivy, Semgrep, agent-scan |
-| Code analysis (SAST) | Does our own code contain insecure patterns? | 4 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
+| Code analysis (SAST) | Does our own code contain insecure patterns? | 6 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
 | Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 6 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
 | Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 8 | Trivy (Dockerfile, Kubernetes/Helm, Terraform/CloudFormation, image, CIS), kubescape; cluster/cloud docs + template |
 | Dynamic testing (DAST) | Can a running app be attacked from outside? | 6 | OWASP ZAP (baseline, API, full, authenticated), Schemathesis, exposure scan |
@@ -48,7 +48,7 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | Developer workflow | Catches problems on the developer's machine before CI. | 3 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **120** | 21 scanner tools plus the library and gate |
+| **Total** |  | **122** | 21 scanner tools plus the library and gate |
 
 **Coverage of the Agentic Security presentation:** 97 items checked: 47 covered, 47 partial, 3 not covered. Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). Roadmap: 16 done, 6 partly, 1 documented only, 7 planned (penetration-test gaps).
 <!-- coverage:end -->

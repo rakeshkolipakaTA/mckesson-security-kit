@@ -105,4 +105,15 @@ pyj "$T/o8/findings.json" 'any(f["rule"].startswith("CIS-DOCKER-") and f["severi
 echo "== switches"
 o="$(SEC_SBOM=off scripts/scan.sh --explain examples/clean-python 2>&1)"; grep -qE "^  sbom +skip +turned off" <<< "$o"; check "SEC_SBOM=off is honoured" 0 $?
 
+echo "== extra SAST packs (SEC_SEMGREP_PACKS)"
+SKIPALL="gitleaks,trivy,bandit,pip-audit,npm-audit,eslint,agent-scan,modelscan,sbom,workflow-scan,k8s-posture,gitleaks-history"
+SEC_SEMGREP_PACKS="p/jwt,../evil,p/x;rm" scripts/scan.sh "$R" --out "$T/pk1" --partial --skip "$SKIPALL" >"$T/pk1.log" 2>&1; check "scan with custom packs exits 0" 0 $?
+grep -q "semgrep extra packs: p/jwt$" "$T/pk1.log"; check "only the valid pack is used" 0 $?
+[ "$(grep -c 'ignored invalid Semgrep pack' "$T/pk1.log")" = 2 ]; check "malformed pack names are rejected (no argument injection)" 0 $?
+pyj "$T/pk1/summary.json" "d['tool_status'].get('semgrep')=='ok'"; check "semgrep still ran fine" 0 $?
+SEC_SEMGREP_PACKS=none scripts/scan.sh "$R" --out "$T/pk2" --partial --skip "$SKIPALL" >"$T/pk2.log" 2>&1; check "packs=none exits 0" 0 $?
+grep -q "semgrep extra packs: none" "$T/pk2.log"; check "packs=none adds nothing" 0 $?
+scripts/scan.sh "$R" --out "$T/pk3" --partial --skip "$SKIPALL" >"$T/pk3.log" 2>&1
+grep -q "semgrep extra packs: .*p/security-audit.*p/fastapi.*p/dockerfile" "$T/pk3.log"; check "default adds security-audit, framework and Dockerfile packs for a Python app with a Dockerfile" 0 $?
+
 echo; echo "new-tools test: $PASS passed, $FAILN failed"; [ "$FAILN" = 0 ]

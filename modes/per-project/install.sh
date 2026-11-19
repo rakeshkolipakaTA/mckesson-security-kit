@@ -64,7 +64,7 @@ want() { [ "$CI" = all ] || [ "$CI" = "$1" ]; }
 INSTALLED=""
 if want github; then
   put github-actions-release.yml security-release.github.yml; put github-actions-dast.yml security-dast.github.yml
-  put github-actions-pr.yml security-scan.github.yml
+  put github-actions-pr.yml security-scan.github.yml; put github-actions-codeql.yml security-codeql.github.yml
   if [ ! -f "$REPO/.github/workflows/security-scan.yml" ]; then
     mkdir -p "$REPO/.github/workflows"; cp "$T/github-actions-pr.yml" "$REPO/.github/workflows/security-scan.yml"
     INSTALLED=".github/workflows/security-scan.yml"
