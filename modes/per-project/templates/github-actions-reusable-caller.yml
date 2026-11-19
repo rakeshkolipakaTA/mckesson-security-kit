@@ -12,10 +12,10 @@ permissions:
   pull-requests: write          # lets the scan post / update its ONE comment on the pull request
 jobs:
   security:
-    uses: rakeshkolipakaTA/mckesson-security-kit/.github/workflows/security-scan-reusable.yml@f4b787b422c54f5b8e1ffdeaef6b8079c8799040  # main at the time of writing; use a release SHA once one exists
+    uses: rakeshkolipakaTA/mckesson-security-kit/.github/workflows/security-scan-reusable.yml@497b634c51c73e736ce76ef78528d521eef17ad9  # main at the time of writing; use a release SHA once one exists
     with:
       enforce: false          # flip to true when the team is ready to block PRs
-      framework-ref: f4b787b422c54f5b8e1ffdeaef6b8079c8799040   # the same commit: the scanner scripts it checks out are pinned too
+      framework-ref: 497b634c51c73e736ce76ef78528d521eef17ad9   # the same commit: the scanner scripts it checks out are pinned too
     secrets:                  # pass only what is needed (delete the ones you do not use)
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}
