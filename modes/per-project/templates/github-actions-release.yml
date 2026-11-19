@@ -29,9 +29,7 @@ jobs:
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
       - name: Show results on the run page
         if: always()
-        run: |
-          f=$(find .security/reports -maxdepth 2 -name summary.md 2>/dev/null | sort | tail -1)
-          [ -n "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY" || true
+        run: .security/warden ci-report --no-comment
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
@@ -39,6 +37,7 @@ jobs:
           path: |
             .security/reports/20*/summary.html
             .security/reports/20*/summary.md
+            .security/reports/20*/sbom.cdx.json
       # Only reached when the gate above passed:
       - name: Push image
         run: echo 'EDIT - docker login, docker tag and docker push to JFrog / ACR go here'

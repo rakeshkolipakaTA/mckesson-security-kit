@@ -1,5 +1,7 @@
 # .github/workflows/security-scan.yml  - security scan on every pull request and on main.
 # Starts report-only (SEC_PRESET=starter in .security/config.env). Change it to standard to block PRs: warden config set SEC_PRESET standard.
+# No server needed. Results appear in GitHub itself: the run page (summary), the "Files changed" tab (markers on the risky lines) and ONE
+# comment on the pull request that is updated on every push. If you later set SEC_DASHBOARD_URL, each scan is also sent to the dashboard.
 name: security-scan
 on:
   pull_request:
@@ -11,7 +13,8 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
-  # security-events: write      # only if you enable the code-scanning upload step at the bottom
+  pull-requests: write          # lets Warden post / update its ONE comment on the pull request (delete this line to turn comments off)
+  # security-events: write      # only for the optional Security-tab upload at the bottom (see the note there)
 jobs:
   scan:
     runs-on: ubuntu-latest        # or your self-hosted runner (it needs Docker)
@@ -27,12 +30,13 @@ jobs:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
-      - name: Show results on the run page
+      - name: Show results in GitHub (run summary, file markers, pull request comment)
         if: always()
-        run: |
-          f=$(find .security/reports -maxdepth 2 -name summary.md 2>/dev/null | sort | tail -1)
-          if [ -n "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY"; else echo "No report was produced - see the Security scan step log." >> "$GITHUB_STEP_SUMMARY"; fi
-      - name: Keep the report (HTML + markdown + SARIF; NOT the raw tool output)
+        run: .security/warden ci-report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WARDEN_PR_COMMENT: ${{ vars.WARDEN_PR_COMMENT }}      # set the repository variable to "off" to stop the pull request comment
+      - name: Keep the report (HTML + markdown + SBOM + SARIF; NOT the raw tool output)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
@@ -41,10 +45,12 @@ jobs:
             .security/reports/20*/summary.html
             .security/reports/20*/summary.md
             .security/reports/20*/results.sarif
+            .security/reports/20*/sbom.cdx.json
           retention-days: 14
-      # Optional: show findings in the GitHub "Security" tab (needs GitHub code scanning / Advanced Security on the repo).
-      # - name: Upload to code scanning
-      #   if: always()
-      #   uses: github/codeql-action/upload-sarif@v3
-      #   with:
-      #     sarif_file: .security/reports/latest
+      # Optional: also list findings in the GitHub "Security" tab (code scanning). Free for public repositories; private repositories need
+      # GitHub Advanced Security. To turn it on: uncomment `security-events: write` above AND set the repository variable WARDEN_CODE_SCANNING=true.
+      - name: Upload to code scanning
+        if: always() && vars.WARDEN_CODE_SCANNING == 'true'
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f  # v3.28.18
+        with:
+          sarif_file: .security/reports/latest/results.sarif

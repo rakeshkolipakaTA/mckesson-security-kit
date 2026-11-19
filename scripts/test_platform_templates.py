@@ -84,6 +84,14 @@ def test_generated_dependabot_has_a_cooldown():
     assert all(u.get("cooldown", {}).get("default-days", 0) >= 3 for u in dep["updates"])
 
 
+def test_pr_workflow_shows_results_in_github_without_a_server():
+    t = open(os.path.join(TPL, "github-actions-pr.yml")).read()
+    assert "warden ci-report" in t and "pull-requests: write" in t and "WARDEN_PR_COMMENT" in t
+    i = t.index("warden ci-report"); assert "if: always()" in t[max(0, i - 200):i], "the report step must run even when the scan step fails"
+    assert "vars.WARDEN_CODE_SCANNING == 'true'" in t and re.search(r"upload-sarif@[0-9a-f]{40}", t), "the Security-tab upload is opt-in and pinned"
+    assert "# security-events: write" in t, "write access to the Security tab stays commented out until a team opts in"
+    assert "sbom.cdx.json" in t
+
 def test_release_templates_pin_actions_to_commit_shas_and_declare_least_privilege():
     for name in ("github-actions-sign-release.yml", "github-actions-scorecard.yml"):
         text = open(f"{TPL}/{name}").read()

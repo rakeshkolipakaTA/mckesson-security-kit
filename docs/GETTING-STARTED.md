@@ -18,7 +18,7 @@ On every pull request / push, these checks run (only the ones that fit your stac
 
 **Building an AI agent / LLM app?** The same commands also detect that (agent frameworks, LLM SDKs, MCP config) and add agent-specific checks: unsafe tools, fail-open guardrails, unregistered models, risky MCP servers, secrets in prompts, malicious model files. Read [agentic-security.md](agentic-security.md); to test a running agent in QA use `warden redteam` ([agentic-redteam.md](agentic-redteam.md)); for code that fixes the findings use `warden agentlib` ([agentic-runtime-library.md](agentic-runtime-library.md)).
 
-The result is one HTML report, a markdown summary on the pipeline page, and a pass/fail gate.
+The result is one HTML report, a summary on the pipeline page, markers on the risky lines of a pull request, one updated pull request comment, and a pass/fail gate. **GitHub only, no server needed**: see [github-only-quickstart.md](github-only-quickstart.md).
 
 ## Before you start
 - **Docker** installed and running (Docker Desktop on Windows/Mac, Docker Engine on Linux). On Windows use WSL2 or Git Bash.

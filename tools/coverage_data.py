@@ -89,6 +89,7 @@ INVENTORY = [
  ("AI agent: runtime controls (library)", "agentsec.audit", "Hash-chained audit log, PII masked, tamper detection", "your agent code", "runtime", RL, "Ship to WORM storage / SIEM yourself"),
  ("AI agent: runtime controls (library)", "agentsec.broker", "Short-lived, audience-scoped agent credentials naming the human acted for", "your agent code", "runtime", RL, "Reference only: not an identity provider or vault"),
  # ---- Gate & reporting
+ ("Gate, policy & reporting", "GitHub-native reporting (warden ci-report)", "Shows a scan in GitHub with no server: run summary, markers on risky lines, one updated pull request comment; untrusted text escaped", "GitHub Actions", "PR / push", VP, "Logic tested against a mock GitHub API and a real report; not yet seen on a live pull request. Fork pull requests get no comment (read-only token)"),
  ("Gate, policy & reporting", "Policy gate (severity thresholds)", "Blocks builds on new Critical/High findings (PR) and all Critical/High (release)", "all", "PR / release", V, "Thresholds are central; projects cannot relax them"),
  ("Gate, policy & reporting", "Baseline (legacy findings)", "Records existing findings so only new ones block", "all", "PR / release", V, ""),
  ("Gate, policy & reporting", "Time-boxed exceptions and tool waivers", "Reason, approver and expiry are mandatory; expired ones stop applying", "all", "PR / release", V, ""),
@@ -161,16 +162,17 @@ INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the o
 
 # our own regression tests (what proves the framework works)
 SUITES = [
- ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates", 21),
+ ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting", 22),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
- ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode", 46),
+ ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report", 50),
  ("scripts/test-newtools.sh", "SBOM, licences, git history, workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP", 22),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
  ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),
  ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers (unit)", 16),
  ("scripts/test_dashboard.py", "Dashboard auth, ingest, hostile input, views, SLA, alerts, publisher (unit)", 20),
  ("scripts/test_tickets.py", "Ticket creation for Jira / GitHub / Azure Boards against local stand-ins (unit)", 11),
- ("scripts/test_platform_templates.py", "Dependabot / Renovate, CI templates pinned and least-privilege, Falco rules, process kit, SLA text (unit)", 10),
+ ("scripts/test_platform_templates.py", "Dependabot / Renovate, CI templates pinned and least-privilege, GitHub-native reporting wiring, Falco rules, process kit, SLA text (unit)", 11),
+ ("scripts/test_gh_report.py", "GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API)", 17),
  ("scripts/test_tools.py", "Exposure, repo-posture and API-fuzz helpers (unit)", 7),
  ("agentic/tests/test_agentsec.py", "Runtime-controls library (unit)", 24),
  ("agentic/tests/test_agentsec_extra.py", "Lineage, classification, retention, encrypted store, policy admin, network egress (unit)", 54),

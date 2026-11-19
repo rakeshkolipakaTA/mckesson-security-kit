@@ -24,6 +24,9 @@ jobs:
         # For APIs, passive crawling finds little. Use an ACTIVE scan of specific URLs WITH parameters
         # (QA only, with the owners' approval):
         #   .security/warden scan --zap-mode full --zap-url "$QA_URL/search?q=test,$QA_URL/items/1"
+      - name: Show results on the run page
+        if: always()
+        run: .security/warden ci-report --no-comment
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:

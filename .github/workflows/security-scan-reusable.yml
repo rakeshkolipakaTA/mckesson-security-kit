@@ -16,6 +16,7 @@ on:
       FRAMEWORK_TOKEN: {required: false, description: "Token that can read the templates repo, only if it is private/internal"}
 permissions:
   contents: read
+  pull-requests: write          # for the single pull request comment; the calling workflow must grant it too
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -45,9 +46,12 @@ jobs:
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ${{ runner.temp }}/warden-framework/scripts/scan.sh "$GITHUB_WORKSPACE" --out "$RUNNER_TEMP/warden-report"
-      - name: Show results on the run page
+      - name: Show results in GitHub (run summary, file markers, pull request comment)
         if: always()
-        run: '[ -f "$RUNNER_TEMP/warden-report/summary.md" ] && cat "$RUNNER_TEMP/warden-report/summary.md" >> "$GITHUB_STEP_SUMMARY" || true'
+        run: python3 -I "$RUNNER_TEMP/warden-framework/scripts/gh_report.py" --report "$RUNNER_TEMP/warden-report" --root "$GITHUB_WORKSPACE"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WARDEN_PR_COMMENT: ${{ vars.WARDEN_PR_COMMENT }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
@@ -56,4 +60,5 @@ jobs:
             ${{ runner.temp }}/warden-report/summary.html
             ${{ runner.temp }}/warden-report/summary.md
             ${{ runner.temp }}/warden-report/results.sarif
+            ${{ runner.temp }}/warden-report/sbom.cdx.json
           retention-days: 14

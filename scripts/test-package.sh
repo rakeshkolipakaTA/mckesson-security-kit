@@ -45,6 +45,10 @@ echo "== first scan through the installed command"
 ( cd "$r" && PATH="$T/venv/bin:$PATH" .security/warden scan >"$T/scan.log" 2>&1 ); check "scan on a clean repo exits 0" 0 $?
 [ -f "$r/.security/reports/latest/summary.html" ]; check "report written inside the repo's .security/reports" 0 $?
 grep -q '"result": "PASS' "$r/.security/reports/latest/summary.json"; check "clean repo passes" 0 $?
+( cd "$r" && PATH="$T/venv/bin:$PATH" GITHUB_STEP_SUMMARY="$T/ghsum.md" GITHUB_REPOSITORY=o/r GITHUB_SHA=abc GITHUB_RUN_ID=1 .security/warden ci-report >"$T/ci.log" 2>&1 ); check "warden ci-report runs (no server, no token)" 0 $?
+grep -q "Warden security scan" "$T/ghsum.md"; check "ci-report wrote the GitHub job summary" 0 $?
+grep -q "not a pull request" "$T/ci.log"; check "ci-report skips the PR comment outside a pull request" 0 $?
+grep -q "warden ci-report" "$r/.github/workflows/security-scan.yml"; check "generated GitHub workflow calls ci-report" 0 $?
 
 echo "== disable / enable (time-boxed)"
 cd "$r"; export PATH="$T/venv/bin:$PATH"

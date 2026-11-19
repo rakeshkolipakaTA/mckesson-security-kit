@@ -7,7 +7,7 @@ Two ways to use it. **Option A is the default**: `warden init` sets it up for yo
 It runs `.security/warden scan` on every pull request, every push to `main`/`master`, and manually (Actions tab > security-scan > Run workflow).
 
 1. Commit and push `.security/` and `.github/workflows/security-scan.yml`.
-2. Open a pull request. A check named **security-scan** appears. Open it: the run page shows the summary table, and the **security-report** artifact holds the HTML report.
+2. Open a pull request. A check named **security-scan** appears, and Warden shows the result inside GitHub with no server: **one comment on the pull request** (updated on every push), **markers on the risky lines** in the Files changed tab, a **summary on the run page**, and the **security-report** artifact with the full HTML report and SBOM. Details and limits: [github-only-quickstart.md](github-only-quickstart.md).
 3. The check is **green even with findings** while `SEC_PRESET=starter` (report-only). Set `SEC_PRESET=standard` in `.security/config.env` to make it fail on policy violations.
 
 ### Make it a required check (so a failing scan blocks the merge)
@@ -19,7 +19,7 @@ Settings > Secrets and variables > Actions: add secret `SONAR_TOKEN` and variabl
 Pull requests from forks do not get secrets; SonarQube is skipped for them by GitHub's design.
 
 ### Show findings in the Security tab (optional)
-If your repo has GitHub code scanning (Advanced Security), uncomment the `upload-sarif` step at the bottom of the workflow and the `security-events: write` permission. Findings then appear under **Security > Code scanning**. SARIF contains source-code findings only (not ZAP URLs or image layers).
+The workflow already contains the code-scanning upload step. To turn it on (public repo, or private with GitHub Advanced Security): uncomment `security-events: write` in the workflow permissions and set the repository variable `WARDEN_CODE_SCANNING=true`.
 
 ### Self-hosted runners
 Use `runs-on: [self-hosted, linux]`. The runner needs Docker and outbound access listed by `warden doctor`.

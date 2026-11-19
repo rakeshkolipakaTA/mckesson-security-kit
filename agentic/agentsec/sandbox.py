@@ -134,11 +134,18 @@ def run_command(argv, *, image=DEFAULT_IMAGE, timeout=10, memory="128m", cpus=0.
         r.join(timeout=5)
     res.truncated = res.truncated or over.is_set()
     res.exit_code = p.returncode
-    try:
-        insp = subprocess.run([docker, "inspect", "-f", "{{.State.OOMKilled}}", name], capture_output=True, text=True, timeout=15)
-        res.oom_killed = insp.stdout.strip() == "true"
-    except (OSError, subprocess.TimeoutExpired):
-        pass
+    def oom_flag():
+        try:
+            insp = subprocess.run([docker, "inspect", "-f", "{{.State.OOMKilled}}", name], capture_output=True, text=True, timeout=15)
+            return insp.stdout.strip() == "true"
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    res.oom_killed = oom_flag()
+    if not res.oom_killed and res.exit_code == 137 and not (res.timed_out or res.truncated):
+        # Docker sets OOMKilled from an asynchronous cgroup event, so right after a memory kill it can still read false (seen ~1 run in 10).
+        # We did not kill this container ourselves (no timeout, no output flood), so exit 137 (SIGKILL) means the memory limit did.
+        time.sleep(0.3)
+        res.oom_killed = oom_flag() or True
     subprocess.run([docker, "rm", "-f", name], capture_output=True, timeout=60)
     res.duration = round(time.time() - t0, 2)
     res.stdout = bufs["out"].decode("utf-8", "replace")

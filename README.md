@@ -3,7 +3,7 @@
 Reference implementation of a central DevSecOps scanning plan: one framework, tools for every layer, templates for GitHub Actions / Jenkins / Azure DevOps,
 and guides written so that **a developer with no DevOps help can onboard a repo in about 10 minutes**.
 
-**Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+**Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**. Version 1 runs entirely in GitHub Actions and shows results in GitHub (pull request comment, file markers, run summary, report artifact): [docs/github-only-quickstart.md](docs/github-only-quickstart.md). The dashboard is optional and can be added later.
 
 ```bash
 pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.0"   # once, in a venv (team lead)
@@ -44,11 +44,11 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 29 | 17 Semgrep agent rules, 13 agent-scan checks, modelscan |
 | AI agent: red-team probes | Does a running agent resist real attack attempts? | 21 | 19 deterministic probes; DeepTeam (7 frameworks) and promptfoo templates |
 | AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 16 | agentsec (16 modules) |
-| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 12 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
+| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 13 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
 | Developer workflow | Catches problems on the developer's machine before CI. | 3 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **119** | 21 scanner tools plus the library and gate |
+| **Total** |  | **120** | 21 scanner tools plus the library and gate |
 
 **Coverage of the Agentic Security presentation:** 97 items checked: 47 covered, 47 partial, 3 not covered. Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). Roadmap: 16 done, 6 partly, 1 documented only, 7 planned (penetration-test gaps).
 <!-- coverage:end -->

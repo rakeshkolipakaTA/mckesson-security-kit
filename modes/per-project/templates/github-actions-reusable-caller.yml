@@ -9,6 +9,7 @@ on:
     branches: [main, master]
 permissions:
   contents: read
+  pull-requests: write          # lets the scan post / update its ONE comment on the pull request
 jobs:
   security:
     uses: rakeshkolipakaTA/mckesson-security-kit/.github/workflows/security-scan-reusable.yml@b1751a0098d61c6822541dbc3dd0f4464fc42bd5  # main at the time of writing; use a release SHA once one exists
