@@ -30,6 +30,7 @@ With `channel=auto` the launcher falls back to the newest copy already in the ca
 1. Change code, bump `VERSION` (for example `1.1.0`), run the tests (`make test`), commit.
 2. `scripts/release.sh 1.1.0` creates tag `v1.1.0` and moves `v1`. Then push as it prints.
 3. Fixes to a released version: bump the patch (`1.1.1`); never re-use a tag.
+4. **No new version needed for everyday changes:** commit, then `scripts/release.sh --roll` moves only `v1` to the new commit (push with `git push -f origin v1`). Repos on `channel=auto` use it on their next run; the named tags (`v1.0.1`...) stay put, so pinned repos do not change. Cut a numbered release only when you want a named point to pin or roll back to.
 A breaking change needs a new major (`v2`); repos on `v1` do not move to it by themselves.
 
 ## Security of automatic updates (read this)

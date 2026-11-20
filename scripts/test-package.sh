@@ -132,5 +132,12 @@ $G rev-parse -q --verify refs/tags/v9.10.0 >/dev/null; check "release tag v9.10.
 [ "$($G rev-parse 'v9^{commit}')" = "$($G rev-parse 'v9.10.0^{commit}')" ]; check "the moving major tag points at the new release" 0 $?
 ( cd "$SRCR" && "$RS" 9.10.0 >"$T/rl4.log" 2>&1 ); check "release refuses to reuse a tag" 1 $?
 has "release prints the push commands and does not push" "git push -f origin v9" "$T/rl3.log"
+echo "x" > "$SRCR/extra.txt"; ( cd "$SRCR" && "$RS" --roll >"$T/rl5.log" 2>&1 ); check "roll refuses a dirty tree" 1 $?
+$G add -A && $G commit -qm four; OLD="$($G rev-parse 'v9.10.0^{commit}')"
+( cd "$SRCR" && "$RS" --roll >"$T/rl6.log" 2>&1 ); check "roll moves the major tag with no new version" 0 $?
+[ "$($G rev-parse 'v9^{commit}')" = "$($G rev-parse HEAD)" ]; check "v9 now points at the newest commit" 0 $?
+[ "$($G rev-parse 'v9.10.0^{commit}')" = "$OLD" ]; check "the released tag v9.10.0 did not move (pinned repos are unaffected)" 0 $?
+( cd "$r2" && WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden pin --auto >/dev/null 2>&1; sed -i 's|^source=.*|source=git+file://'"$SRCR"'@v9|' .security/warden.lock; WARDEN_HOME="$WH" PATH="/usr/bin:/bin" .security/warden --version >"$T/a9.log" 2>&1 ); check "a repo on the major line picks up the rolled commit" 0 $?
+has "and installed it as a new cached copy" "installing the newest" "$T/a9.log"
 
 echo; echo "package test: $PASS passed, $FAILN failed"; [ "$FAILN" = 0 ]
