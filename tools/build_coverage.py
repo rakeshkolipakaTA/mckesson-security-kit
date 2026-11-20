@@ -123,7 +123,7 @@ def write_xlsx():
     # ---- Summary (formulas read the other sheets, so edits there flow through)
     ws = wb.active
     ws.title = "Summary"
-    ws["A1"], ws["A1"].font = "McKesson security scanning kit: what we test", F(bold=True, size=14)
+    ws["A1"], ws["A1"].font = "Warden security scanning kit: what we test", F(bold=True, size=14)
     ws["A2"], ws["A2"].font = f"Generated {dt.date.today().isoformat()} from tools/coverage_data.py. Counts below are formulas over the other sheets.", F(italic=True, color="666666")
     r0 = 4
     for j, h in enumerate(["Category", "Question it answers", "Checks", "Tools"], 1):

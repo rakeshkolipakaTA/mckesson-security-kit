@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize scanner output, apply the McKesson security gate, write summary reports.
+"""Normalize scanner output, apply the Warden security gate, write summary reports.
 
 Reads raw tool reports from <out>/raw/, writes <out>/findings.json, summary.json, summary.md.
 Exit code: 0 = pass (or report-only), 1 = gate failed (only with --enforce), 2 = usage/IO error.

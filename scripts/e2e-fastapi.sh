@@ -4,7 +4,7 @@
 # Usage: scripts/e2e-fastapi.sh        Takes ~6 min. Leaves nothing running.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$HERE"
-IMG=mckesson-fastapi-sample:test NET=sec-test NAME=fastapi-sample
+IMG=warden-fastapi-sample:test NET=sec-test NAME=fastapi-sample
 cleanup() { docker rm -f "$NAME" >/dev/null 2>&1; docker network rm "$NET" >/dev/null 2>&1; }
 trap cleanup EXIT
 docker build -q -t "$IMG" examples/fastapi-sample >/dev/null || exit 2

@@ -1,5 +1,5 @@
 {
-  "_comment": "Proposed internal defaults from plan sections 7. To be agreed with McKesson security team; not McKesson policy.",
+  "_comment": "Proposed internal defaults from plan sections 7. To be agreed with the organisation's security team; not an organisational policy.",
   "severity_order": [
     "CRITICAL",
     "HIGH",

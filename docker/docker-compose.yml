@@ -1,7 +1,7 @@
-# Central platform services for the McKesson scanning framework.
+# Central platform services for the Warden scanning framework.
 #   Local SonarQube only:   cd docker && docker compose --env-file ../versions.env up -d
 #   Server (Sonar + dashboard, reachable by CI):   scripts/platform-up.sh   (generates credentials, see docs/dashboard.md)
-name: mckesson-sonar
+name: warden-platform
 services:
   db:
     image: postgres:16-alpine

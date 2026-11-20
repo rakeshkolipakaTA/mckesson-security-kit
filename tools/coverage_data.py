@@ -28,6 +28,8 @@ INVENTORY = [
  ("Container & IaC", "Trivy Kubernetes / Helm checks", "Privileged pods, no securityContext, writable root FS, risky ClusterRoles", "K8s manifests, Helm charts", "PR / push", V, "Found real issues on the pilot repo; Terraform/CloudFormation coverage not tested"),
  ("Container & IaC", "Trivy image scan", "OS-package and library CVEs, secrets inside a built image", "Docker images", "release (CD)", V, "Needs the built image name (SEC_IMAGE)"),
  # ---- DAST
+ ("Dynamic testing (DAST)", "Logged-in scans: login types (SEC_ZAP_AUTH)", "Lets ZAP and API fuzzing test what is behind a login: basic, cookie, JSON login, HTML form with CSRF, OAuth2 client credentials / password grant (SSO token flows)", "web apps, APIs", "QA scan", V, "A failed login stops the scan (never an anonymous scan reported clean). Tested against a mock app and mock identity provider and a real ZAP container; not against a real Entra ID / Okta tenant; interactive SAML / MFA SSO is not automated (a headless-browser step is described in the guide)"),
+ ("Developer workflow", "Test-credential handling (warden creds, NAME_FILE, prompt)", "Usernames, passwords and tokens come from CI secrets, files, a local store outside git (mode 600) or a hidden prompt; config.env refuses secrets; logged-in tokens masked in CI logs", "all", "every scan", V, "Secret managers (Vault, Key Vault, Secrets Manager) are used through a workflow step, documented but not run here"),
  ("Dynamic testing (DAST)", "OWASP ZAP baseline", "Passive checks: security headers, cookies, information disclosure", "running web app/API (QA)", "post-deploy QA", V, "Finds little on pure APIs"),
  ("Dynamic testing (DAST)", "OWASP ZAP API scan", "Imports an OpenAPI spec and probes each operation", "running API (QA)", "post-deploy QA", VP, "Sends example values only; found none of the planted bugs"),
  ("Dynamic testing (DAST)", "OWASP ZAP full (active) scan", "Reflected/DOM XSS, CORS, error disclosure, injection on seeded URLs", "running web app/API (QA)", "post-deploy QA", VP, "Unauthenticated; no POST bodies; missed SQLi and path traversal on the sample"),
@@ -165,16 +167,18 @@ INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the o
 
 # our own regression tests (what proves the framework works)
 SUITES = [
- ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting", 22),
+ ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store", 24),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
  ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script", 83),
- ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP, extra SAST packs", 36),
+ ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs", 46),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
  ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),
  ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers, opt-in git history (unit)", 17),
  ("scripts/test_dashboard.py", "Dashboard auth, ingest, hostile input, views, SLA, alerts, publisher (unit)", 20),
  ("scripts/test_tickets.py", "Ticket creation for Jira / GitHub / Azure Boards against local stand-ins (unit)", 11),
  ("scripts/test_platform_templates.py", "Dependabot / Renovate, CI templates pinned and least-privilege, GitHub-native reporting wiring, Falco rules, process kit, SLA text (unit)", 11),
+ ("scripts/test_zap_auth.py", "ZAP login types and SSO token flows against a mock app and identity provider; secrets from files and prompt; no echo of secrets", 17),
+ ("scripts/test_creds.py", "Local credential store: names only in lists, mode 600, profiles, refuses git working trees", 4),
  ("scripts/test_gh_report.py", "GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API)", 17),
  ("scripts/test_tools.py", "Exposure, repo-posture and API-fuzz helpers (unit)", 7),
  ("agentic/tests/test_agentsec.py", "Runtime-controls library (unit)", 24),

@@ -5,8 +5,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; source "$HERE/versions.env"
 : "${NVD_API_KEY:?set NVD_API_KEY}"
-docker volume inspect mckesson-depcheck-data >/dev/null 2>&1 || docker volume create mckesson-depcheck-data >/dev/null
-docker run --rm --user root --entrypoint chmod -v mckesson-depcheck-data:/d "$DEPCHECK_IMAGE" 777 /d
-docker run --rm --user "$(id -u):$(id -g)" -v mckesson-depcheck-data:/usr/share/dependency-check/data -e NVD_API_KEY \
+docker volume inspect warden-depcheck-data >/dev/null 2>&1 || docker volume create warden-depcheck-data >/dev/null
+docker run --rm --user root --entrypoint chmod -v warden-depcheck-data:/d "$DEPCHECK_IMAGE" 777 /d
+docker run --rm --user "$(id -u):$(id -g)" -v warden-depcheck-data:/usr/share/dependency-check/data -e NVD_API_KEY \
   "$DEPCHECK_IMAGE" --updateonly --nvdApiKey "$NVD_API_KEY"
 echo "Dependency-Check database updated."

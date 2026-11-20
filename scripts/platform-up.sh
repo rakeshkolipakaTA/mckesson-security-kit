@@ -13,7 +13,7 @@ mkdir -p "$STATE"; chmod 700 "$STATE"
 rand() { python3 -c 'import secrets,string;a=string.ascii_letters+string.digits;print("".join(secrets.choice(a) for _ in range(int(__import__("sys").argv[1]))))' "$1"; }
 if [ ! -f "$ENVF" ]; then
   # an existing SonarQube database keeps the password it was created with; only a fresh install gets a random one
-  DBPW="$(rand 24)"; docker volume inspect mckesson-sonar_sonar_db >/dev/null 2>&1 && DBPW="sonar-local-only"
+  DBPW="$(rand 24)"; docker volume inspect warden-platform_sonar_db >/dev/null 2>&1 && DBPW="sonar-local-only"
   ( umask 077; { echo "DASHBOARD_PASSWORD=$(rand 24)"; echo "DASHBOARD_INGEST_TOKEN=$(rand 40)"; echo "SONAR_DB_PASSWORD=$DBPW"; } > "$ENVF" ); echo "generated credentials in $ENVF"
 fi
 set -a; . "$ENVF"; set +a
@@ -22,7 +22,7 @@ export SONAR_PUBLIC_URL="http://$HOST:$SP"
 cd "$HERE/docker"
 docker compose --env-file ../versions.env --profile dashboard up -d --build 2>&1 | tail -5
 for _ in $(seq 1 30); do curl -sf "http://127.0.0.1:$DP/health" >/dev/null && break; sleep 2; done
-curl -sf "http://127.0.0.1:$DP/health" >/dev/null && echo "dashboard: up" || { echo "dashboard did not start: docker logs mckesson-sonar-dashboard-1" >&2; exit 1; }
+curl -sf "http://127.0.0.1:$DP/health" >/dev/null && echo "dashboard: up" || { echo "dashboard did not start: docker logs warden-platform-dashboard-1" >&2; exit 1; }
 cat <<OUT
 
 ================ warden platform is running ================

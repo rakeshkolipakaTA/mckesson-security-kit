@@ -32,6 +32,6 @@ Copy this into your team's tracker. A normal developer can complete every item; 
 - [ ] Release pipeline uses `gate --gate release`
 
 ## Ongoing
-- [ ] Team knows the remediation targets (proposed: Critical 3 days, High 14, Medium 60, Low 90; to be agreed with McKesson security)
+- [ ] Team knows the remediation targets (proposed: Critical 3 days, High 14, Medium 60, Low 90; to be agreed with your security team)
 - [ ] Kit upgraded when the platform team announces a new version (`warden init <repo>` again)
 - [ ] Expired exceptions reviewed monthly

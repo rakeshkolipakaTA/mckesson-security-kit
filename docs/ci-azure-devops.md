@@ -25,4 +25,4 @@ Caution: in Azure, an undefined `$(VAR)` is passed literally as the text `$(VAR)
 See [cd-release-gates.md](cd-release-gates.md); the YAML has the image-gate step commented at the bottom.
 
 ## Notes
-Untested against a real McKesson Azure DevOps organisation yet; the YAML parses and uses only `script`, `PublishPipelineArtifact@1` and a logging command.
+Untested against a real Azure DevOps organisation yet; the YAML parses and uses only `script`, `PublishPipelineArtifact@1` and a logging command.

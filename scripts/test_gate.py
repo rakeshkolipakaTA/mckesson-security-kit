@@ -236,7 +236,7 @@ def test_baseline_dates_are_kept_and_overdue_findings_block_again():
 def test_crosswalk_assigns_controls_and_summarises():
     cw = json.load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "compliance", "crosswalk.json")))
     fs = [{"tool": "redteam", "rule": "RT-AUTH-02", "category": "AI red team", "severity": "HIGH"}, {"tool": "gitleaks", "rule": "x", "category": "Secrets", "severity": "HIGH"},
-          {"tool": "semgrep", "rule": "mckesson-agent-guardrail-fail-open-function", "category": "SAST", "severity": "MEDIUM"}]
+          {"tool": "semgrep", "rule": "warden-agent-guardrail-fail-open-function", "category": "SAST", "severity": "MEDIUM"}]
     gate.assign_controls(fs, cw)
     assert fs[0]["controls"] == ["P1-AUTHZ"] and fs[1]["controls"] == ["P5-SECRETS"] and "P3-GUARDRAIL" in fs[2]["controls"]
     sm = {x["control"]: x for x in gate.crosswalk_summary(fs, cw)}

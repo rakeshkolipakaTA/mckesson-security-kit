@@ -39,7 +39,7 @@ selftest 21, onboarding 83, package 46, new-tools 22, e2e-agent 12, unit suites 
 - **Detection gaps**: in `examples/fastapi-sample` path traversal and reflected XSS were missed by all static tools (ZAP found the XSS); Sonar CE missed the SQL injection that Bandit and Semgrep caught. A hardcoded JWT secret in the Node fixture, and a hardcoded password and a command injection in the Java fixture, went undetected. "No findings" is not "secure".
 - **DAST**: baseline finds little on pure APIs; `api` mode missed injection bugs; `full` mode found XSS/CORS but missed SQLi in a URL path and path traversal, and POST bodies / authenticated scans are not covered (see fastapi-e2e.md).
 - **Duplicates**: different *code* scanners report the same line separately (not merged yet); `npm audit` vs Trivy duplicates for lockfiles are handled.
-- **Severity policy values are proposals** to agree with McKesson security.
+- **Severity policy values are proposals** to agree with your security team.
 
 ## Not built (later phases)
 Go/.NET/PHP/Ruby profiles, ZAP authenticated + POST scans and automation plans, SLA-breach tracking, central dashboard beyond `aggregate.py`, PR comments, license compliance, pre-built scanner images in a registry, Terraform/Kubernetes policies beyond Trivy.

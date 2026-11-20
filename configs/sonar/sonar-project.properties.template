@@ -1,5 +1,5 @@
 # Copy to repo root as sonar-project.properties (or let scan.sh pass these as -D flags).
-sonar.projectKey=mckesson-<project>
+sonar.projectKey=warden-<project>
 sonar.projectName=<Project Name>
 sonar.sources=src
 sonar.tests=tests

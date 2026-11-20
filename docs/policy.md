@@ -1,5 +1,5 @@
 # Security policy (proposed defaults, plan section 7)
-Defined in `configs/policies/policy.json`. These are proposed internal defaults to agree with McKesson's security team, not McKesson policy.
+Defined in `configs/policies/policy.json`. These are proposed internal defaults to agree with your security team, not an organisational policy.
 
 | Severity | PR gate | Release gate |
 |---|---|---|

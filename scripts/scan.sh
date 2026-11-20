@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# McKesson security scan runner.
+# Warden security scan runner.
 #   scripts/scan.sh <repo-path> [options]        central mode: scan any repo from one install
 #   .security/kit/scripts/scan.sh [options]      per-project kit: scans the enclosing repo
 # Developers normally use the `warden` wrapper instead (docs/GETTING-STARTED.md).
@@ -69,14 +69,19 @@ REPO="$(cd "$REPO" && pwd)"; NAME="$(basename "$REPO")"
 SEC_DIR="${SEC_DIR_ARG:-$REPO/.security}"; [ -d "$SEC_DIR" ] && SEC_DIR="$(cd "$SEC_DIR" && pwd)"
 
 # ---- config.env: parsed, never sourced (a pull request must not be able to run code on the scanner) ----
-CONFIG_KEYS=" SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
+CONFIG_KEYS=" SEC_ZAP_AUTH SEC_ZAP_LOGIN_URL SEC_ZAP_LOGIN_PAGE SEC_ZAP_USER_FIELD SEC_ZAP_PASSWORD_FIELD SEC_ZAP_CSRF_FIELD SEC_ZAP_LOGIN_EXTRA SEC_ZAP_TOKEN_PATH SEC_ZAP_OAUTH_SCOPE SEC_ZAP_OAUTH_AUDIENCE SEC_ZAP_OAUTH_CLIENT_AUTH SEC_CREDENTIALS_PROFILE SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
 load_config() {
   local line k v
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line%%#*}"; line="${line//$'\r'/}"
     [[ "$line" =~ ^[[:space:]]*([A-Z_]+)[[:space:]]*=[[:space:]]*(.*[^[:space:]])?[[:space:]]*$ ]] || continue
     k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]:-}"; v="${v#\"}"; v="${v%\"}"
-    [[ "$CONFIG_KEYS" == *" $k "* ]] || { echo "config.env: ignoring unknown key $k" >&2; continue; }
+    if [[ "$CONFIG_KEYS" != *" $k "* ]]; then
+      if [[ "$k" =~ PASSWORD|SECRET|TOKEN|COOKIE|CREDENTIAL|^ZAP_AUTH|^ZAP_OAUTH ]]; then
+        echo "config.env: $k looks like a SECRET and was ignored. Never put credentials in a file in the repository: use CI secrets, 'warden creds set $k' on your machine, or $k""_FILE (docs/zap-authentication.md)" >&2
+      else echo "config.env: ignoring unknown key $k" >&2; fi
+      continue
+    fi
     [[ "$v" =~ ^[A-Za-z0-9_./:@,=?\&%+*-]*$ ]] || { echo "config.env: ignoring $k (value has unsupported characters)" >&2; continue; }
     [ -z "${!k:-}" ] && printf -v "$k" '%s' "$v"   # an empty env var counts as unset
   done < "$1"
@@ -85,6 +90,46 @@ load_config() {
 # organisation-wide defaults set once by the platform team (SonarQube / dashboard URLs): lowest precedence, a repo's config.env wins
 [ -f "$HERE/configs/central.env" ] && load_config "$HERE/configs/central.env"
 if [ -z "${SONAR_HOST_URL:-}" ] && [ -n "${SEC_SONAR_HOST_URL:-}" ]; then export SONAR_HOST_URL="$SEC_SONAR_HOST_URL"; fi
+# Test credentials for your own machine: ~/.config/warden/credentials[.PROFILE].env (outside the repo, mode 600; `warden creds set NAME`).
+# Only known names are read; anything already in the environment (CI secrets) wins. Parsed, never sourced.
+CRED_ALLOWED=" ZAP_AUTH_USER ZAP_AUTH_PASSWORD ZAP_AUTH_TOKEN ZAP_AUTH_HEADER ZAP_AUTH_COOKIE ZAP_OAUTH_CLIENT_ID ZAP_OAUTH_CLIENT_SECRET API_TEST_TOKEN REDTEAM_TOKEN SONAR_TOKEN WARDEN_DASHBOARD_TOKEN "
+load_credentials() {
+  local f line k v kf
+  if [ -n "${WARDEN_CREDENTIALS_FILE:-}" ] && [ -z "${SEC_CREDENTIALS_PROFILE:-}" ]; then f="$WARDEN_CREDENTIALS_FILE"
+  else f="${XDG_CONFIG_HOME:-$HOME/.config}/warden/credentials${SEC_CREDENTIALS_PROFILE:+.$SEC_CREDENTIALS_PROFILE}.env"; fi
+  [[ "${SEC_CREDENTIALS_PROFILE:-}" =~ ^[A-Za-z0-9_-]*$ ]] || { echo "SEC_CREDENTIALS_PROFILE has unsupported characters; ignoring the credentials file" >&2; return 0; }
+  [ -f "$f" ] || return 0
+  [ "$(stat -c %a "$f" 2>/dev/null || echo 600)" -le 600 ] 2>/dev/null || echo "NOTE: $f is readable by other users: run chmod 600 $f" >&2
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ "$line" == \#* || "$line" != *=* ]] && continue
+    k="${line%%=*}"; v="${line#*=}"; v="${v%$'\r'}"
+    [[ "$CRED_ALLOWED" == *" $k "* ]] || continue
+    kf="${k}_FILE"; [ -z "${!k:-}" ] && [ -z "${!kf:-}" ] && export "$k=$v"   # CI secrets and NAME_FILE win over this file
+  done < "$f"
+}
+load_credentials
+# GitHub Actions only masks the secrets it knows. A token obtained by a LOGIN is new, so mask it explicitly in case any tool prints it.
+mask_header() {
+  [ "${GITHUB_ACTIONS:-}" = true ] || return 0
+  local v="${1#*: }" p; printf '::add-mask::%s\n' "$v"
+  case "$v" in Bearer\ *|Basic\ *) printf '::add-mask::%s\n' "${v#* }";; esac
+  local IFS=';'; for p in $v; do p="${p# }"; [ "${p#*=}" != "$p" ] && printf '::add-mask::%s\n' "${p#*=}"; done; return 0
+}
+# SEC_ZAP_AUTH=basic|cookie|login-json|form|oauth2-client|oauth2-password (bearer / header stay available through ZAP_AUTH_TOKEN / ZAP_AUTH_HEADER).
+# Result: ONE header, handed to ZAP and to API fuzzing. A failed login stops the scan: an anonymous scan would look clean when it is not.
+AUTH_DONE=""
+acquire_auth() {
+  [ -n "${SEC_ZAP_AUTH:-}" ] && [ "$SEC_ZAP_AUTH" != none ] || return 0
+  [ -n "$AUTH_DONE" ] && return 0
+  local hdr prompt=(); [ -t 0 ] && prompt=(--prompt)
+  local k; for k in SEC_ZAP_LOGIN_URL SEC_ZAP_LOGIN_PAGE SEC_ZAP_USER_FIELD SEC_ZAP_PASSWORD_FIELD SEC_ZAP_CSRF_FIELD SEC_ZAP_LOGIN_EXTRA SEC_ZAP_TOKEN_PATH SEC_ZAP_OAUTH_SCOPE SEC_ZAP_OAUTH_AUDIENCE SEC_ZAP_OAUTH_CLIENT_AUTH; do
+    [ -n "${!k:-}" ] && export "$k"
+  done
+  hdr="$(python3 -I "$HERE/scripts/zap_auth.py" --mode "$SEC_ZAP_AUTH" "${prompt[@]}")" || return 1
+  mask_header "$hdr"
+  unset ZAP_AUTH_TOKEN; export ZAP_AUTH_HEADER="$hdr" API_AUTH_HEADER="$hdr"; AUTH_DONE=1
+  log "login ok: authenticated as the test user ($SEC_ZAP_AUTH); the credential stays in memory only"
+}
 : "${SEC_PRESET:=starter}" "${SEC_PROFILE:=auto}" "${SEC_SKIP:=}" "${SEC_DEPCHECK_NOUPDATE:=0}" "${SEC_EXCLUDE_PATHS:=}" "${SEC_API_SPEC:=}" "${SEC_API_NETWORK:=}" "${SEC_EXPOSURE_TARGETS:=}" "${SEC_FUZZ_EXAMPLES:=40}"
 # `warden disable --until DATE --reason ...` switches scanning off for a limited time only; after DATE it resumes by itself
 if [ -n "${SEC_DISABLED_UNTIL:-}" ]; then
@@ -98,7 +143,7 @@ POLICY="$HERE/configs/policies/policy.json"
 PRESET_OUT="$(python3 -I "$HERE/scripts/toolplan.py" preset --policy "$POLICY" --preset "$SEC_PRESET")" || exit 2
 read -r PRESET_ENFORCE PRESET_GATE <<< "$PRESET_OUT"
 : "${SEC_ENFORCE:=$PRESET_ENFORCE}" "${SEC_GATE:=$PRESET_GATE}"
-: "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}" "${SEC_SEMGREP_PACKS:=auto}" "${SEC_HISTORY_FETCH:=auto}"
+: "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}" "${SEC_SEMGREP_PACKS:=auto}" "${SEC_ZAP_AUTH:=}" "${SEC_HISTORY_FETCH:=auto}"
 : "${SEC_REDTEAM_URL:=}" "${SEC_REDTEAM_NETWORK:=}" "${SEC_REDTEAM_CONTRACT:=}"
 case "$SEC_GATE" in pr|release) ;; *) echo "SEC_GATE must be pr or release" >&2; exit 2;; esac
 ENFORCE=""; [ "$SEC_ENFORCE" = 1 ] && ENFORCE="--enforce"
@@ -210,8 +255,8 @@ run_gitleaks() {
 }
 run_trivy_fs() {
   log "trivy: dependency vulnerabilities, secrets, Dockerfile/IaC misconfiguration"
-  ensure_volume mckesson-trivy-cache "$TRIVY_IMAGE"
-  docker run --rm --user "$UIDGID" -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache \
+  ensure_volume warden-trivy-cache "$TRIVY_IMAGE"
+  docker run --rm --user "$UIDGID" -e TRIVY_CACHE_DIR=/cache -v warden-trivy-cache:/cache \
     -v "$REPO:/src:ro" -v "$TRIVY_CFG:/cfg/trivy.yaml:ro" -v "$OUT/raw:/out" \
     "$TRIVY_IMAGE" fs --config /cfg/trivy.yaml --format json --output /out/trivy-fs.json --quiet /src 2>&1 | tail -2
   TOOLS+=(trivy-fs)
@@ -248,8 +293,8 @@ run_gitleaks_history() {
 }
 run_sbom() {
   log "sbom: CycloneDX software bill of materials (Trivy)"
-  ensure_volume mckesson-trivy-cache "$TRIVY_IMAGE"
-  docker run --rm --user "$UIDGID" -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache -v "$REPO:/src:ro" -v "$TRIVY_CFG:/cfg/trivy.yaml:ro" -v "$OUT/raw:/out" \
+  ensure_volume warden-trivy-cache "$TRIVY_IMAGE"
+  docker run --rm --user "$UIDGID" -e TRIVY_CACHE_DIR=/cache -v warden-trivy-cache:/cache -v "$REPO:/src:ro" -v "$TRIVY_CFG:/cfg/trivy.yaml:ro" -v "$OUT/raw:/out" \
     "$TRIVY_IMAGE" fs --config /cfg/trivy.yaml --scanners vuln --format cyclonedx --output /out/sbom.json --quiet /src 2>&1 | tail -2
   [ -s "$OUT/raw/sbom.json" ] && cp "$OUT/raw/sbom.json" "$OUT/sbom.cdx.json"   # CycloneDX; kept next to the report for download
   TOOLS+=(sbom)
@@ -272,11 +317,12 @@ run_k8s_posture() {
   TOOLS+=(k8s-posture)
 }
 run_api_fuzz() {
+  acquire_auth || { echo "api-fuzz: the login failed, so fuzzing was NOT run (docs/zap-authentication.md)" >&2; TOOLS+=(api-fuzz); return; }
   log "schemathesis: API fuzzing from the OpenAPI spec $SEC_API_SPEC (QA/UAT only)"
   ensure_scanner_image || return
   local net=(); [ -n "${SEC_API_NETWORK:-$SEC_ZAP_NETWORK}" ] && net=(--network "${SEC_API_NETWORK:-$SEC_ZAP_NETWORK}")
-  docker run --rm "${net[@]}" -e API_TEST_TOKEN -v "$OUT/raw:/out" "$SCANNER_IMAGE" sh -c \
-    'schemathesis run "$0" --checks all --hypothesis-max-examples="$1" --hypothesis-suppress-health-check=all ${API_TEST_TOKEN:+-H "Authorization: Bearer $API_TEST_TOKEN"} --junit-xml=/out/schemathesis.xml' \
+  docker run --rm "${net[@]}" -e API_TEST_TOKEN -e API_AUTH_HEADER -v "$OUT/raw:/out" "$SCANNER_IMAGE" sh -c \
+    'schemathesis run "$0" --checks all --hypothesis-max-examples="$1" --hypothesis-suppress-health-check=all ${API_TEST_TOKEN:+-H "Authorization: Bearer $API_TEST_TOKEN"} ${API_AUTH_HEADER:+-H "$API_AUTH_HEADER"} --junit-xml=/out/schemathesis.xml' \
     "$SEC_API_SPEC" "$SEC_FUZZ_EXAMPLES" > "$OUT/api-fuzz.log" 2>&1
   grep -E 'passed|failed|errored' "$OUT/api-fuzz.log" | tail -1
   python3 -I "$HERE/scripts/api_fuzz_report.py" --junit "$OUT/raw/schemathesis.xml" --spec "$SEC_API_SPEC" --out "$OUT/raw/api-fuzz.json" || echo "api-fuzz produced no report, see $OUT/api-fuzz.log"
@@ -294,10 +340,10 @@ run_repo_posture() {
 }
 run_trivy_image() {
   log "trivy: container image $SEC_IMAGE"
-  ensure_volume mckesson-trivy-cache "$TRIVY_IMAGE"
-  docker run --rm -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache -v /var/run/docker.sock:/var/run/docker.sock \
+  ensure_volume warden-trivy-cache "$TRIVY_IMAGE"
+  docker run --rm -e TRIVY_CACHE_DIR=/cache -v warden-trivy-cache:/cache -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$OUT/raw:/out" "$TRIVY_IMAGE" image --scanners vuln,secret,license --format json --output /out/trivy-image.json --quiet "$SEC_IMAGE" 2>&1 | tail -2
-  docker run --rm -e TRIVY_CACHE_DIR=/cache -v mckesson-trivy-cache:/cache -v /var/run/docker.sock:/var/run/docker.sock -v "$OUT/raw:/out" "$TRIVY_IMAGE" image \
+  docker run --rm -e TRIVY_CACHE_DIR=/cache -v warden-trivy-cache:/cache -v /var/run/docker.sock:/var/run/docker.sock -v "$OUT/raw:/out" "$TRIVY_IMAGE" image \
     --compliance docker-cis-1.6.0 --format json --output /out/trivy-image-cis.json --quiet "$SEC_IMAGE" >/dev/null 2>&1 || true   # CIS Docker benchmark (advisory)
   TOOLS+=(trivy-image)
 }
@@ -413,10 +459,10 @@ run_eslint() {
 run_depcheck() {
   log "OWASP dependency-check"
   if [ -z "${NVD_API_KEY:-}" ] && [ "$SEC_DEPCHECK_NOUPDATE" != 1 ]; then echo "WARNING: NVD_API_KEY not set - the NVD download is very slow / rate limited. Prepare the database with scripts/depcheck-update.sh and set SEC_DEPCHECK_NOUPDATE=1."; fi
-  ensure_volume mckesson-depcheck-data "$DEPCHECK_IMAGE"
+  ensure_volume warden-depcheck-data "$DEPCHECK_IMAGE"
   local extra=(); [ -n "${NVD_API_KEY:-}" ] && extra+=(--nvdApiKey "$NVD_API_KEY"); [ "$SEC_DEPCHECK_NOUPDATE" = 1 ] && extra+=(--noupdate)
   TOOLS+=(dependency-check)
-  docker run --rm --user "$UIDGID" -v mckesson-depcheck-data:/usr/share/dependency-check/data \
+  docker run --rm --user "$UIDGID" -v warden-depcheck-data:/usr/share/dependency-check/data \
     -v "$REPO:/src:ro" -v "$OUT/raw:/out" -v "$HERE/configs/dependency-check/suppression.xml:/cfg/suppression.xml:ro" \
     "$DEPCHECK_IMAGE" --scan /src --format JSON --out /out --project "$NAME" --suppression /cfg/suppression.xml \
     --exclude '**/.venv/**' --exclude '**/node_modules/**' "${extra[@]}" > "$OUT/depcheck.log" 2>&1
@@ -451,13 +497,13 @@ run_redteam() {
 }
 run_sonar() {
   : "${SONAR_HOST_URL:?set SONAR_HOST_URL (e.g. http://localhost:9000)}" "${SONAR_TOKEN:?set SONAR_TOKEN}"
-  local key="${SEC_SONAR_KEY:-mckesson-$NAME}"
+  local key="${SEC_SONAR_KEY:-warden-$NAME}"
   log "sonarqube analysis (project key $key)"
-  ensure_volume mckesson-sonar-scanner-cache "$SONAR_SCANNER_IMAGE"
+  ensure_volume warden-sonar-scanner-cache "$SONAR_SCANNER_IMAGE"
   TOOLS+=(sonarqube)   # registered first: if anything below fails the gate reports it (fail closed)
   # -Dsonar.qualitygate.wait=true makes the scanner exit non-zero on a failed quality gate; gate.py judges that, so the exit code is ignored here
   docker run --rm --network host --user "$UIDGID" -e SONAR_HOST_URL -e SONAR_TOKEN -e SONAR_USER_HOME=/cache \
-    -v mckesson-sonar-scanner-cache:/cache -v "$REPO:/usr/src:ro" -v "$OUT:/out" "$SONAR_SCANNER_IMAGE" sonar-scanner \
+    -v warden-sonar-scanner-cache:/cache -v "$REPO:/usr/src:ro" -v "$OUT:/out" "$SONAR_SCANNER_IMAGE" sonar-scanner \
     -Dsonar.projectKey="$key" -Dsonar.projectName="$NAME" -Dsonar.sources=. \
     -Dsonar.scanner.metadataFilePath=/out/report-task.txt -Dsonar.qualitygate.wait=true \
     -Dsonar.exclusions='**/.security/**,**/node_modules/**,**/dist/**,**/build/**,**/.venv/**,**/venv/**,**/*.egg-info/**,**/__pycache__/**,**/.pytest_cache/**' \
@@ -473,6 +519,7 @@ ZAP_WRAP='hn=""; if [ -n "$ZAP_AUTH_TOKEN" ]; then hn=Authorization; hv="Bearer 
 if [ -n "$hn" ]; then hv="${hv// /\\ }"; zo="-config replacer.full_list(0).description=warden-auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=$hn -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$hv"; exec "$@" -z "$zo"; fi
 exec "$@"'
 run_zap() {
+  acquire_auth || { echo "zap: the login failed, so ZAP was NOT run (an anonymous scan would look clean when it is not). Fix the credentials or SEC_ZAP_AUTH settings; see docs/zap-authentication.md" >&2; TOOLS+=(zap); return; }
   log "OWASP ZAP $SEC_ZAP_MODE scan against $SEC_ZAP_URL (authorised, non-production targets only)$([ -n "${ZAP_AUTH_TOKEN:-}${ZAP_AUTH_HEADER:-}" ] && echo ', authenticated')"
   TOOLS+=(zap)
   chmod 777 "$OUT/raw"   # the ZAP image runs as its own user and writes its report here

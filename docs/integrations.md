@@ -72,7 +72,7 @@ A scheduled CI job is the usual home for tickets, for example after the scan: `.
 In `.security/config.env`:
 ```ini
 SEC_SONAR=on                         # run SonarQube (needs SEC_SONAR_HOST_URL + the SONAR_TOKEN secret)
-SEC_SONAR_KEY=mckesson-my-project    # the project key in SonarQube (default: mckesson-<repo folder>)
+SEC_SONAR_KEY=warden-my-project    # the project key in SonarQube (default: warden-<repo folder>)
 ```
 The dashboard needs no switch: the scan publishes whenever a dashboard URL and the token are both present. Check with `warden config show` (it prints both URLs and whether each token is set), then `warden scan`; the last lines say `dashboard: published ...`.
 

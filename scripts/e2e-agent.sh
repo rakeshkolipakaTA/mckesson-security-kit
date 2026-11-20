@@ -11,12 +11,12 @@ PASS=0; FAILN=0
 check() { if [ "$2" = "OK" ]; then echo "  PASS  $1"; PASS=$((PASS+1)); else echo "  FAIL  $1  ($2)"; FAILN=$((FAILN+1)); fi; }
 
 echo "building images..."
-docker build -q -t mckesson-agent-sample:test examples/agent-sample >/dev/null || exit 2
+docker build -q -t warden-agent-sample:test examples/agent-sample >/dev/null || exit 2
 cp -r examples/agent-sample-secure/. "$T/ctx"; cp -r agentic/agentsec "$T/ctx/agentsec"
-docker build -q -t mckesson-agent-sample-secure:test "$T/ctx" >/dev/null || exit 2
+docker build -q -t warden-agent-sample-secure:test "$T/ctx" >/dev/null || exit 2
 docker network create "$NET" >/dev/null 2>&1
-docker run -d --name agent-v --network "$NET" mckesson-agent-sample:test >/dev/null
-docker run -d --name agent-s --network "$NET" -e BROKER_SECRET="$SECRET" mckesson-agent-sample-secure:test >/dev/null
+docker run -d --name agent-v --network "$NET" warden-agent-sample:test >/dev/null
+docker run -d --name agent-s --network "$NET" -e BROKER_SECRET="$SECRET" warden-agent-sample-secure:test >/dev/null
 sleep 4
 tok() { python3 -I -c "
 import sys; sys.path.insert(0,'agentic')
@@ -61,7 +61,7 @@ emit("hardened: nothing blocks except third-party dependency CVEs (those change 
 fail_s = sorted(f["rule"] for f in fs if f["tool"] == "redteam")
 emit("hardened: red team fails ONLY the paraphrased indirect-injection probe (known limit)", fail_s == ["RT-INJ-03"], str(fail_s))
 emit("hardened: no agent governance findings", not [f for f in fs if f["tool"] == "agent-scan"], str([f["rule"] for f in fs if f["tool"] == "agent-scan"]))
-emit("hardened: no agent Semgrep rule fires", not [f for f in fs if "semgrep" in f["tool"] and "mckesson-agent" in f["rule"]], "")
+emit("hardened: no agent Semgrep rule fires", not [f for f in fs if "semgrep" in f["tool"] and "warden-agent" in f["rule"]], "")
 emit("red team probes were run, not skipped", ss.get("redteam", {}).get("probes_run", 0) >= 20 and sv.get("redteam", {}).get("probes_run", 0) >= 20, f"{sv.get('redteam', {}).get('probes_run')},{ss.get('redteam', {}).get('probes_run')}")
 emit("modelscan flags the malicious pickle as CRITICAL and the gate fails", any(f["tool"] == "modelscan" and f["severity"] == "CRITICAL" for f in fm) and rcm == 1, f"exit {rcm}")
 PY

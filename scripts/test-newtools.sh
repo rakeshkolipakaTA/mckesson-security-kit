@@ -83,8 +83,8 @@ pyj "$T/o4/summary.json" 'd["overdue"]>0 and "HIGH" in d["overdue_by_severity"]'
 grep -q 'Past their remediation deadline' "$T/o4/summary.md"; check "overdue section in the report" 0 $?
 
 echo "== API fuzzing + exposure scan of a running app (QA stand-in)"
-docker build -q -t mckesson-fastapi-sample:test examples/fastapi-sample >/dev/null || exit 2
-docker network create "$NET" >/dev/null 2>&1; docker rm -f "$APP" >/dev/null 2>&1; docker run -d --name "$APP" --network "$NET" mckesson-fastapi-sample:test >/dev/null
+docker build -q -t warden-fastapi-sample:test examples/fastapi-sample >/dev/null || exit 2
+docker network create "$NET" >/dev/null 2>&1; docker rm -f "$APP" >/dev/null 2>&1; docker run -d --name "$APP" --network "$NET" warden-fastapi-sample:test >/dev/null
 for _ in $(seq 1 30); do docker run --rm --network "$NET" curlimages/curl -sf "http://$APP:8000/health" >/dev/null 2>&1 && break; sleep 1; done
 IP="$(docker inspect -f "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "$APP")"
 SEC_API_SPEC="http://$APP:8000/openapi.json" SEC_API_NETWORK="$NET" SEC_EXPOSURE_TARGETS="http://$IP:8000" \
@@ -109,11 +109,56 @@ docker logs nt-auth 2>&1 | grep -q "AUTHHDR='Bearer s3cr3t-token'"; check "ZAP r
 grep -q 'authenticated' "$T/o6.log"; check "the scan log says the scan was authenticated" 0 $?
 grep -q 's3cr3t-token' "$T/o6.log" "$T/o6/zap.log" 2>/dev/null; check "the token does not appear in the scan logs" 1 $?
 docker rm -f nt-auth >/dev/null 2>&1
+echo "== logins (username + password, form, SSO-style token): credentials come from a local file, never from the repo"
+cat > "$T/authsrv2.py" <<'PY'
+import http.server, json, sys, urllib.parse
+class H(http.server.BaseHTTPRequestHandler):
+    def log_message(self, f, *a): sys.stderr.write("AUTHHDR=%r COOKIE=%r\n" % (self.headers.get("Authorization"), self.headers.get("Cookie"))); sys.stderr.flush()
+    def reply(self, code, body, cookies=(), loc=None):
+        self.send_response(code); self.send_header("Content-Type", "text/html")
+        for c in cookies: self.send_header("Set-Cookie", c)
+        if loc: self.send_header("Location", loc)
+        self.end_headers(); self.wfile.write(body.encode())
+    def do_POST(self):
+        b = self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode()
+        if self.path == "/login":
+            d = json.loads(b); ok = d.get("username") == "tester" and d.get("password") == "S3cret!pw"
+            return self.reply(200 if ok else 401, json.dumps({"access_token": "login-token-77"} if ok else {"error": "bad"}))
+        if self.path == "/form":
+            f = dict(urllib.parse.parse_qsl(b))
+            if f.get("username") == "tester" and f.get("password") == "S3cret!pw":
+                return self.reply(302, "", ["sessionid=SESS42; Path=/", "theme=dark; Path=/"], "/")
+            return self.reply(200, "Invalid credentials")
+        self.reply(404, "no")
+    def do_GET(self):
+        c = self.headers.get("Cookie") or ""
+        ok = self.headers.get("Authorization") == "Bearer login-token-77" or ("sessionid=SESS42" in c and "theme=dark" in c)
+        self.reply(200 if ok else 401, "<html>secret area</html>" if ok else "nope")
+http.server.ThreadingHTTPServer(("0.0.0.0", 8000), H).serve_forever()
+PY
+docker rm -f nt-auth2 >/dev/null 2>&1; docker run -d --name nt-auth2 --network "$NET" -p 127.0.0.1:18765:8000 -v "$T/authsrv2.py:/a.py:ro" python:3.12-slim python /a.py >/dev/null; sleep 2
+mkdir -p "$T/creds"; ( umask 077; printf 'ZAP_AUTH_USER=tester\nZAP_AUTH_PASSWORD=S3cret!pw\n' > "$T/creds/credentials.env" )
+ZSKIP="gitleaks,trivy,semgrep,bandit,pip-audit"
+WARDEN_CREDENTIALS_FILE="$T/creds/credentials.env" SEC_ZAP_AUTH=login-json SEC_ZAP_LOGIN_URL=http://127.0.0.1:18765/login SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip "$ZSKIP" --zap-url http://nt-auth2:8000/ --out "$T/o9" >"$T/o9.log" 2>&1
+docker logs nt-auth2 2>&1 | grep -q "AUTHHDR='Bearer login-token-77'"; check "username + password login (credentials from the local file): ZAP carried the obtained token" 0 $?
+grep -q 'login ok' "$T/o9.log"; check "the log says the login worked" 0 $?
+grep -q -e 'S3cret!pw' -e 'login-token-77' "$T/o9.log" "$T/o9/zap.log" 2>/dev/null; check "neither the password nor the token appears in the scan logs" 1 $?
+WARDEN_CREDENTIALS_FILE="$T/creds/credentials.env" SEC_ZAP_AUTH=form SEC_ZAP_LOGIN_URL=http://127.0.0.1:18765/form SEC_ZAP_LOGGED_OUT_REGEX='Invalid' SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip "$ZSKIP" --zap-url http://nt-auth2:8000/ --out "$T/o10" >"$T/o10.log" 2>&1
+docker logs nt-auth2 2>&1 | grep -q "COOKIE='sessionid=SESS42; theme=dark'"; check "form login: ZAP carried the session cookies" 0 $?
+ZAP_AUTH_PASSWORD=wrong-pw-1 WARDEN_CREDENTIALS_FILE="$T/creds/credentials.env" SEC_ZAP_AUTH=login-json SEC_ZAP_LOGIN_URL=http://127.0.0.1:18765/login SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip "$ZSKIP" --zap-url http://nt-auth2:8000/ --out "$T/o11" >"$T/o11.log" 2>&1; check "a wrong password does not break the scan run" 0 $?
+grep -q 'login failed' "$T/o11.log"; check "a failed login is reported, not silently skipped" 0 $?
+grep -q 'wrong-pw-1' "$T/o11.log"; check "and the wrong password is not echoed" 1 $?
+pyj "$T/o11/summary.json" 'd["tool_status"].get("zap")!="ok"'; check "ZAP is not reported as clean when the login failed (it did not run)" 0 $?
+docker rm -f nt-auth2 >/dev/null 2>&1
+CR="$T/cfgsecret"; cp -a examples/clean-python "$CR"; mkdir -p "$CR/.security"; printf 'SEC_PRESET=starter\nZAP_AUTH_PASSWORD=SuperSecretValue123\n' > "$CR/.security/config.env"
+scripts/scan.sh --explain "$CR" >"$T/cs.log" 2>&1
+grep -q 'ZAP_AUTH_PASSWORD looks like a SECRET and was ignored' "$T/cs.log"; check "a credential written into config.env is refused with advice" 0 $?
+grep -q 'SuperSecretValue123' "$T/cs.log"; check "and its value is never echoed" 1 $?
 echo "== infrastructure as code: Terraform and CloudFormation"
 scripts/scan.sh examples/iac-sample --partial --skip semgrep,bandit,pip-audit,gitleaks --out "$T/o7" >/dev/null 2>&1
 pyj "$T/o7/findings.json" 'any(f["path"].endswith("main.tf") and f["category"]=="IaC/Config" for f in d) and any(f["path"].endswith("template.yaml") and f["category"]=="IaC/Config" for f in d)'; check "insecure Terraform and CloudFormation are flagged" 0 $?
 echo "== image: CIS Docker benchmark + licences"
-scripts/scan.sh examples/clean-python --partial --skip gitleaks,trivy,semgrep,bandit,pip-audit,sbom --image mckesson-fastapi-sample:test --out "$T/o8" >/dev/null 2>&1
+scripts/scan.sh examples/clean-python --partial --skip gitleaks,trivy,semgrep,bandit,pip-audit,sbom --image warden-fastapi-sample:test --out "$T/o8" >/dev/null 2>&1
 pyj "$T/o8/findings.json" 'any(f["rule"].startswith("CIS-DOCKER-") and f["severity"] in ("MEDIUM","LOW") for f in d)'; check "CIS Docker benchmark controls reported (advisory)" 0 $?
 echo "== switches"
 o="$(SEC_SBOM=off scripts/scan.sh --explain examples/clean-python 2>&1)"; grep -qE "^  sbom +skip +turned off" <<< "$o"; check "SEC_SBOM=off is honoured" 0 $?

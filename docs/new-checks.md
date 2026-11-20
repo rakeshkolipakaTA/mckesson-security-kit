@@ -40,7 +40,7 @@ Reads settings through the GitHub API: branch protection or rulesets (reviews, r
 Why it matters: a required security check only blocks anything when branch protection requires it.
 
 ## Authenticated DAST and API fuzzing
-**ZAP with a login:** set the CI secret `ZAP_AUTH_TOKEN` (sent as `Authorization: Bearer ...`) or `ZAP_AUTH_HEADER="Name: value"`. It reaches the container through the environment, never the command line, and is added to every ZAP request. Verified against a server that returns 401 without the header.
+**ZAP with a login:** many login types (username and password, form, session cookie, SSO token flows) and how to keep the credentials out of git: [zap-authentication.md](zap-authentication.md). The simplest form: set the CI secret `ZAP_AUTH_TOKEN` (sent as `Authorization: Bearer ...`) or `ZAP_AUTH_HEADER="Name: value"`. It reaches the container through the environment, never the command line, and is added to every ZAP request. Verified against a server that returns 401 without the header.
 **API fuzzing:** Schemathesis reads your OpenAPI spec and sends crafted, schema-aware requests to every operation (bodies included), with `API_TEST_TOKEN` as bearer token if set. Findings: server errors (MEDIUM, often a sign of unhandled input or injection), operations that ignore authentication (HIGH), schema violations (LOW). Each finding carries a `curl` line to reproduce it (auth headers redacted).
 **Only run both against QA/UAT you own**: they send real attack-style traffic and can create or modify data.
 Limits: fuzzing finds crashes and contract violations, not business-logic flaws; a spec that is wrong or missing hides operations.

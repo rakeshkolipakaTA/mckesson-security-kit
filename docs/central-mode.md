@@ -6,7 +6,7 @@ Docker 24+ with Compose, Python 3.8+ (stdlib only), outbound HTTPS to: Docker Hu
 ## 2. Install
 ```bash
 git clone <mckesson-security-kit> && cd mckesson-security-kit   # this folder
-make build-scanner        # builds mckesson-scanner:1 (Bandit + pip-audit, versions from versions.env)
+make build-scanner        # builds warden-scanner:1 (Bandit + pip-audit, versions from versions.env)
 make sonar-up             # optional; SonarQube at http://localhost:9000 (bound to localhost)
 ```
 Tool versions live only in `versions.env`; images are pinned (digests for Sonar).

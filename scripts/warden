@@ -16,6 +16,7 @@
 #   warden agentlib [dir]    (agents) copy the agentsec runtime-controls library (guardrails, policy, audit, ...) into your repo
 #   warden hook install|remove   run `warden quick` automatically before every `git push`
 #   warden init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor]   add security scanning to a repo (default: current folder)
+#   warden creds set|list|delete NAME   keep test credentials (ZAP logins, tokens) on THIS machine, outside the repo; typed hidden; CI uses CI secrets (docs/zap-authentication.md)
 #   warden pin [--auto]      fix this repo to the warden version running now (reviewed upgrades), or --auto to follow the newest release again
 #   warden upgrade           refresh the generated files to the installed warden version (keeps your config, exceptions, baseline)
 #   warden disable --until YYYY-MM-DD --reason "text"   switch scanning off for a limited time (max 90 days); it resumes by itself
@@ -140,6 +141,7 @@ case "$c" in
   open)     cmd_open;;
   tickets)  rep="$(sec_dir)/reports/latest"; [ -d "$rep" ] || rep=reports/latest
             exec python3 -I "$ROOT/scripts/tickets.py" --report "$rep" "$@";;
+  creds)    exec python3 -I "$ROOT/scripts/creds.py" "$@";;
   pin)      [ "$IN_KIT" = 1 ] && { echo "this repo vendors its engine; nothing to pin"; exit 2; }
             lk="$(sec_dir)/warden.lock"; [ -f "$lk" ] || { echo "no $lk: run warden init first"; exit 1; }
             v="${WARDEN_VERSION:-$(head -1 "$ROOT/VERSION" 2>/dev/null)}"; src="$(lock_get source)"; base="${src%@*}"

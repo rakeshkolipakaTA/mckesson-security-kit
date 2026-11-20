@@ -1,7 +1,7 @@
-# McKesson agentic-AI code rules (Python). Each rule maps to a presentation domain (P1-P8) and OWASP LLM / Agents risk.
+# Warden agentic-AI code rules (Python). Each rule maps to a presentation domain (P1-P8) and OWASP LLM / Agents risk.
 # Tested with annotated cases in agentic.py:  docker run --rm -v "$PWD/configs/semgrep/agentic:/rules" <semgrep-image> semgrep --test --metrics=off /rules
 rules:
-  - id: mckesson-agent-guardrail-fail-open-function
+  - id: warden-agent-guardrail-fail-open-function
     languages: [python]
     severity: ERROR
     message: >-
@@ -59,7 +59,7 @@ rules:
           metavariable: $F
           regex: (?i)^(check|validate|verify|moderate|screen|is_(safe|allowed|ok|valid)|allow|guard|filter|sanitize|policy)\w*$|^\w*(guard|moderat|safety|content_filter|check_(input|output))\w*$
 
-  - id: mckesson-agent-guardrail-fail-open-callsite
+  - id: warden-agent-guardrail-fail-open-callsite
     languages: [python]
     severity: ERROR
     message: >-
@@ -112,7 +112,7 @@ rules:
               ...
               return False
 
-  - id: mckesson-agent-tool-param-to-file
+  - id: warden-agent-tool-param-to-file
     mode: taint
     languages: [python]
     severity: ERROR
@@ -163,7 +163,7 @@ rules:
           - pattern: os.listdir(...)
           - pattern: shutil.$F(...)
 
-  - id: mckesson-agent-tool-param-to-network
+  - id: warden-agent-tool-param-to-network
     mode: taint
     languages: [python]
     severity: ERROR
@@ -185,7 +185,7 @@ rules:
           - pattern: urllib.request.Request(...)
           - pattern: aiohttp.$X.$M(...)
 
-  - id: mckesson-agent-tool-param-to-exec
+  - id: warden-agent-tool-param-to-exec
     mode: taint
     languages: [python]
     severity: ERROR
@@ -203,7 +203,7 @@ rules:
           - pattern: os.popen(...)
           - pattern: subprocess.$F(...)
 
-  - id: mckesson-agent-tool-param-to-sql
+  - id: warden-agent-tool-param-to-sql
     mode: taint
     languages: [python]
     severity: ERROR
@@ -220,7 +220,7 @@ rules:
               - pattern: $C.raw($Q, ...)
           - focus-metavariable: $Q
 
-  - id: mckesson-agent-llm-output-to-sink
+  - id: warden-agent-llm-output-to-sink
     mode: taint
     languages: [python]
     severity: ERROR
@@ -247,7 +247,7 @@ rules:
               - pattern: $C.execute($Q, ...)
               - focus-metavariable: $Q
 
-  - id: mckesson-agent-unrestricted-tool-dispatch
+  - id: warden-agent-unrestricted-tool-dispatch
     languages: [python]
     severity: WARNING
     message: >-
@@ -264,7 +264,7 @@ rules:
           metavariable: $C
           regex: (?i).*(call|tool|action|function|fc|step).*
 
-  - id: mckesson-agent-unauthenticated-route
+  - id: warden-agent-unauthenticated-route
     languages: [python]
     severity: WARNING
     message: >-
@@ -314,7 +314,7 @@ rules:
           async def $F(..., $P: $T = Security(...), ...):
               ...
 
-  - id: mckesson-agent-hardcoded-llm-key
+  - id: warden-agent-hardcoded-llm-key
     languages: [python]
     severity: ERROR
     message: >-
@@ -338,14 +338,14 @@ rules:
                   metavariable: $VAR
                   regex: (?i)^.*(api[_-]?key|secret|token|password|credential).*$
 
-  - id: mckesson-agent-trust-remote-code
+  - id: warden-agent-trust-remote-code
     languages: [python]
     severity: ERROR
     message: trust_remote_code=True downloads and executes code from the model repository at load time. Pin the revision and review, or avoid it.
     metadata: {domain: P6, owasp: "LLM03", cwe: "CWE-829", category: security, confidence: HIGH}
     pattern: $F(..., trust_remote_code=True, ...)
 
-  - id: mckesson-agent-unsafe-model-deserialization
+  - id: warden-agent-unsafe-model-deserialization
     languages: [python]
     severity: ERROR
     message: >-
@@ -360,7 +360,7 @@ rules:
           - pattern: dill.load(...)
       - pattern-not: torch.load(..., weights_only=True, ...)
 
-  - id: mckesson-agent-unpinned-model-revision
+  - id: warden-agent-unpinned-model-revision
     languages: [python]
     severity: WARNING
     message: >-
@@ -371,7 +371,7 @@ rules:
       - pattern: $M.from_pretrained($NAME, ...)
       - pattern-not: $M.from_pretrained($NAME, ..., revision=..., ...)
 
-  - id: mckesson-agent-dangerous-tool
+  - id: warden-agent-dangerous-tool
     languages: [python]
     severity: ERROR
     message: >-
@@ -386,7 +386,7 @@ rules:
       - pattern: $F(..., allow_dangerous_code=True, ...)
       - pattern: $F(..., allow_dangerous_requests=True, ...)
 
-  - id: mckesson-agent-sensitive-data-in-logs
+  - id: warden-agent-sensitive-data-in-logs
     languages: [python]
     severity: WARNING
     message: >-
@@ -407,7 +407,7 @@ rules:
           metavariable: $X
           regex: (?is)^(?!["'])(?!.*redact).*\b(prompt|message|messages|user_input|user_message|query|email|headers|authorization|token|api_key|secret|password)\b.*$
 
-  - id: mckesson-agent-unbounded-agent-loop
+  - id: warden-agent-unbounded-agent-loop
     languages: [python]
     severity: WARNING
     message: >-
@@ -434,7 +434,7 @@ rules:
               $I += 1
               ...
 
-  - id: mckesson-agent-non-constant-time-compare
+  - id: warden-agent-non-constant-time-compare
     languages: [python]
     severity: WARNING
     message: >-

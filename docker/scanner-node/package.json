@@ -1,5 +1,5 @@
 {
-  "name": "mckesson-scanner-node",
+  "name": "warden-scanner-node",
   "private": true,
   "dependencies": {
     "eslint": "9.39.1",

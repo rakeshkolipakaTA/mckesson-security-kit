@@ -32,7 +32,7 @@ A check that could not run is shown as **"Did not complete"**, never as clean.
 | GitHub workflow security (zizmor) | Yes, when workflows exist | |
 | AI agent checks (static rules, model files) | Yes, for agent repos | |
 | Container image scan, CIS Docker | When you build an image in the workflow | Set `SEC_IMAGE` (see the release template) |
-| Dynamic scan (ZAP), API fuzzing, exposure checks | When a QA URL exists | Needs a **running** QA app reachable from the runner (`SEC_ZAP_URL`, `SEC_API_SPEC`, `SEC_EXPOSURE_TARGETS`); see the DAST template |
+| Dynamic scan (ZAP), API fuzzing, exposure checks | When a QA URL exists | Logged-in scans (password, token, SSO flows; credentials stay in CI secrets): [zap-authentication.md](zap-authentication.md). Needs a **running** QA app reachable from the runner (`SEC_ZAP_URL`, `SEC_API_SPEC`, `SEC_EXPOSURE_TARGETS`); see the DAST template |
 | AI red-team probes | When a QA agent URL exists | `SEC_REDTEAM_URL` |
 | Repository settings check (branch protection, SECURITY.md, ...) | No | Needs a token that can read settings: pass a `GITHUB_TOKEN` with admin read to the scan step |
 | SonarQube | No | Needs a SonarQube **server** (`SONAR_HOST_URL`, `SONAR_TOKEN`); off by default |

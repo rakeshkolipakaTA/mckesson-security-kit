@@ -4,6 +4,7 @@
 Exit 1 (and no output file) when the JUnit file is missing or empty, so a fuzzer that did not run is a tool error, never a pass."""
 import argparse
 import json
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -17,7 +18,8 @@ RULES = [  # (substring in the failure text, severity, rule, short title, fix)
     ("Undocumented HTTP status code", "LOW", "API-FUZZ-STATUS", "undocumented HTTP status code returned", "Document the status code or fix the behaviour"),
     ("Missing Content-Type", "LOW", "API-FUZZ-HEADERS", "response has a missing or malformed Content-Type", "Always send a correct Content-Type"),
 ]
-SECRET_HDR = re.compile(r"(-H\s+'?(?:Authorization|Cookie|X-Api-Key|X-Auth[\w-]*)\s*:)[^'\n]*'?", re.I)
+_extra = re.escape(os.environ.get("API_AUTH_HEADER", "").split(":", 1)[0].strip()) if ":" in os.environ.get("API_AUTH_HEADER", "") else ""
+SECRET_HDR = re.compile(r"(-H\s+'?(?:Authorization|Cookie|X-Api-Key|X-Auth[\w-]*" + (f"|{_extra}" if _extra else "") + r")\s*:)[^'\n]*'?", re.I)
 
 
 def main():

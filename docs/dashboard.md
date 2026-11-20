@@ -9,9 +9,9 @@ One page that shows every repository's latest security scan, from all tools (git
 ```bash
 scripts/platform-up.sh --host <address people will use>     # dashboard :8090 and SonarQube :9000
 ```
-Credentials are generated once into `~/.warden-platform/platform.env` (mode 600): `DASHBOARD_PASSWORD` (login `warden`) and `DASHBOARD_INGEST_TOKEN` (what CI uses). There are **no default credentials**: the server refuses to start without them. Data lives in the `mckesson-sonar_dashboard_data` Docker volume (SQLite); back it up like any volume.
+Credentials are generated once into `~/.warden-platform/platform.env` (mode 600): `DASHBOARD_PASSWORD` (login `warden`) and `DASHBOARD_INGEST_TOKEN` (what CI uses). There are **no default credentials**: the server refuses to start without them. Data lives in the `warden-platform_dashboard_data` Docker volume (SQLite); back it up like any volume.
 
-Stop/start: `cd docker && docker compose --env-file ../versions.env --profile dashboard down|up -d`. Logs: `docker logs mckesson-sonar-dashboard-1`.
+Stop/start: `cd docker && docker compose --env-file ../versions.env --profile dashboard down|up -d`. Logs: `docker logs warden-platform-dashboard-1`.
 
 ## How scans get there
 CI publishes automatically at the end of every scan when `SEC_DASHBOARD_URL` is set and the CI secret `WARDEN_DASHBOARD_TOKEN` exists: see [integrations.md](integrations.md). Repo, branch, commit and the CI run link are detected from GitHub Actions, Jenkins, Azure DevOps or local git. `warden publish` re-sends the latest report by hand. The dashboard keeps the last 100 scans per repo and branch.

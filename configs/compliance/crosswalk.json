@@ -189,7 +189,7 @@
   ],
   [
    "rule",
-   "mckesson-agent-hardcoded-llm-key",
+   "warden-agent-hardcoded-llm-key",
    [
     "P5-SECRETS"
    ]

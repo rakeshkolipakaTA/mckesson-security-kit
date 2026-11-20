@@ -20,6 +20,14 @@ jobs:
       - name: ZAP baseline (passive, safe)
         env:
           QA_URL: ${{ vars.QA_URL }}
+          # To scan BEHIND a login, set SEC_ZAP_AUTH (and the login URL) in .security/config.env, then uncomment what your login type needs.
+          # Usernames, passwords and tokens are CI secrets, never files in the repo. Putting them in an "Environment" (add `environment: qa` to the job)
+          # releases them only to this job. Login types, SSO and secret managers: docs/zap-authentication.md
+          # ZAP_AUTH_USER: ${{ secrets.ZAP_AUTH_USER }}
+          # ZAP_AUTH_PASSWORD: ${{ secrets.ZAP_AUTH_PASSWORD }}
+          # ZAP_AUTH_TOKEN: ${{ secrets.ZAP_AUTH_TOKEN }}                  # a ready-made bearer token
+          # ZAP_OAUTH_CLIENT_ID: ${{ secrets.ZAP_OAUTH_CLIENT_ID }}        # SSO (OpenID Connect / OAuth2) client
+          # ZAP_OAUTH_CLIENT_SECRET: ${{ secrets.ZAP_OAUTH_CLIENT_SECRET }}
         run: .security/warden scan --zap-url "$QA_URL" --zap-mode baseline
         # For APIs, passive crawling finds little. Use an ACTIVE scan of specific URLs WITH parameters
         # (QA only, with the owners' approval):

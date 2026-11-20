@@ -10,7 +10,7 @@
 | pip-audit "no dependency manifest" | Repo has no `requirements*.txt`/`pyproject.toml`/`setup.py`; tool is skipped. |
 | Many `pip-audit` HIGH findings with no CVSS | pip-audit gives no severity; see [policy.md](policy.md). |
 | Secret false positive in test data | Allowlist in `.security/gitleaks.toml`, or a time-boxed exception. |
-| Dependency-Check very slow first time | NVD download without `NVD_API_KEY`; request a key and keep the `mckesson-depcheck-data` volume. |
+| Dependency-Check very slow first time | NVD download without `NVD_API_KEY`; request a key and keep the `warden-depcheck-data` volume. |
 | `warden doctor` shows a host as NOT reachable | A proxy/firewall blocks it. Ask the platform team to allow it or mirror it (see platform-setup.md). |
 | Semgrep: `Failed to download` / no rules | `semgrep.dev` blocked. Use offline rules: `SEC_SEMGREP_RULES=/path/to/rules` in config.env. |
 | `npm-audit` shows `invalid` | The audit returned an error (no network to the npm registry, or private registry auth). Check `<report>/npm-audit-<n>.log`. |

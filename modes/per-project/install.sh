@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Add the McKesson security kit to ONE repository (per-project mode).
+# Add the Warden security kit to ONE repository (per-project mode).
 #   warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor] [--pin] [--source SRC]
 # Default (installed with pip): THIN - commits only config + CI + a version pin (warden.lock); the engine is installed from the pin.
 # --vendor (default when run from a framework checkout): copies the whole engine into .security/kit (works offline).

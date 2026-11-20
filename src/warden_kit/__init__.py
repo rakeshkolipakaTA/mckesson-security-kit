@@ -1,4 +1,4 @@
-"""McKesson warden kit. The scanning engine is bundled under ``kit/``; ``warden`` (cli.py) runs it."""
+"""Warden kit. The scanning engine is bundled under ``kit/``; ``warden`` (cli.py) runs it."""
 import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))

@@ -1,4 +1,4 @@
-// McKesson standard ESLint security config (flat config). Used by the scanner, independent of the project's own ESLint setup.
+// Warden standard ESLint security config (flat config). Used by the scanner, independent of the project's own ESLint setup.
 import js from "@eslint/js";
 import security from "eslint-plugin-security";
 import noUnsanitized from "eslint-plugin-no-unsanitized";
