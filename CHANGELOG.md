@@ -2,9 +2,11 @@
 
 Repos on the default `channel=auto` follow the newest release of their major line (tag `v1`) automatically; `warden pin` freezes a version. See [docs/updates-and-versions.md](docs/updates-and-versions.md).
 
-## Unreleased
+## 1.0.2 (2026-11-20)
 - **Logged-in ZAP and API-fuzz scans with more login types** (`SEC_ZAP_AUTH`): basic, cookie, JSON login, HTML form (with CSRF), OAuth2 client credentials and password grant (the SSO-friendly token flows). A failed login stops the scan instead of running anonymously. See [docs/zap-authentication.md](docs/zap-authentication.md).
 - **Test credentials stay out of git**: values from CI secrets, `NAME_FILE` (Docker/Kubernetes/Jenkins), a local credentials file outside the repo (`warden creds set|list|delete`, profiles), or a hidden prompt. A secret in `config.env` is refused. Logged-in tokens are masked in GitHub Actions logs.
+- **`scripts/release.sh --roll`** moves the major tag without a new version number (everyday changes need no version bump).
+- **Rename note:** Semgrep agent rule IDs changed from `mckesson-agent-*` to `warden-agent-*`; an exception or baseline entry that names an old rule ID needs updating. Docker image/volume names and SonarQube keys changed too.
 - Names: the word "McKesson" is gone from the code and scan artifacts (rule IDs are now `warden-agent-*`, Docker images and volumes `warden-*`, SonarQube keys `warden-<repo>`). Only the GitHub repository name still contains it.
 
 ## 1.0.1 (2026-11-19)

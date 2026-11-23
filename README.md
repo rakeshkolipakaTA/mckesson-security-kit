@@ -6,7 +6,7 @@ and guides written so that **a developer with no DevOps help can onboard a repo 
 **Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**. Version 1 runs entirely in GitHub Actions and shows results in GitHub (pull request comment, file markers, run summary, report artifact): [docs/github-only-quickstart.md](docs/github-only-quickstart.md). The dashboard is optional and can be added later. Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
-pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.1"   # once, in a venv (team lead)
+pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.2"   # once, in a venv (team lead)
 cd your-repo
 warden init                                 # add scanning (+ GitHub workflow); report-only preset "starter"
 .security/warden doctor                     # check Docker/network
