@@ -1,6 +1,7 @@
 # Central platform services for the Warden scanning framework.
 #   Local SonarQube only:   cd docker && docker compose --env-file ../versions.env up -d
 #   Server (Sonar + dashboard, reachable by CI):   scripts/platform-up.sh   (generates credentials, see docs/dashboard.md)
+#   Optional: scripts/platform-up.sh --defectdojo --dtrack   (DefectDojo findings register, Dependency-Track SBOM monitor; docs/integrations/)
 name: warden-platform
 services:
   db:
@@ -14,6 +15,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
       interval: 5s
       retries: 20
+    restart: unless-stopped
   sonarqube:
     image: ${SONARQUBE_IMAGE}
     depends_on:
@@ -44,4 +46,124 @@ services:
     ports: ["${DASHBOARD_BIND:-0.0.0.0}:${DASHBOARD_PORT:-8090}:8090"]
     volumes: [dashboard_data:/data]
     restart: unless-stopped
-volumes: {sonar_db: {}, sonar_data: {}, sonar_ext: {}, sonar_logs: {}, dashboard_data: {}}
+  # ---- DefectDojo (profile: defectdojo): company-wide findings register. Based on the vendor's compose file for the pinned version.
+  defectdojo-postgres:
+    profiles: [defectdojo]
+    image: ${DEFECTDOJO_POSTGRES_IMAGE}
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_DB: defectdojo
+      POSTGRES_USER: defectdojo
+      POSTGRES_PASSWORD: ${DEFECTDOJO_DB_PASSWORD:-}
+    volumes: [defectdojo_postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U defectdojo -d defectdojo"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+  defectdojo-valkey:
+    profiles: [defectdojo]
+    image: ${DEFECTDOJO_VALKEY_IMAGE}
+    volumes: [defectdojo_redis:/data]
+    restart: unless-stopped
+  defectdojo-initializer:
+    profiles: [defectdojo]
+    image: docker.io/defectdojo/defectdojo-django:${DEFECTDOJO_VERSION}
+    depends_on:
+      defectdojo-postgres: {condition: service_healthy}
+    entrypoint: ['/wait-for-it.sh', 'defectdojo-postgres:5432', '--', '/entrypoint-initializer.sh']
+    environment: &dd-env
+      DD_DATABASE_URL: postgresql://defectdojo:${DEFECTDOJO_DB_PASSWORD:-}@defectdojo-postgres:5432/defectdojo
+      DD_CELERY_BROKER_URL: redis://defectdojo-valkey:6379/0
+      DD_CACHE_URL: redis://defectdojo-valkey:6379/1
+      DD_SECRET_KEY: ${DEFECTDOJO_SECRET_KEY:-}
+      DD_CREDENTIAL_AES_256_KEY: ${DEFECTDOJO_AES_KEY:-}
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+      DD_ALLOWED_HOSTS: "*"
+      DD_DEBUG: "False"
+      DD_ADMIN_USER: admin
+      DD_ADMIN_PASSWORD: ${DEFECTDOJO_ADMIN_PASSWORD:-}
+      DD_ADMIN_MAIL: admin@warden.local
+      DD_ADMIN_FIRST_NAME: Admin
+      DD_ADMIN_LAST_NAME: User
+      DD_INITIALIZE: "true"
+  defectdojo-uwsgi:
+    profiles: [defectdojo]
+    image: docker.io/defectdojo/defectdojo-django:${DEFECTDOJO_VERSION}
+    depends_on:
+      defectdojo-initializer: {condition: service_completed_successfully}
+      defectdojo-valkey: {condition: service_started}
+    entrypoint: ['/wait-for-it.sh', 'defectdojo-postgres:5432', '-t', '30', '--', '/entrypoint-uwsgi.sh']
+    environment: *dd-env
+    volumes: [defectdojo_media:/app/media]
+    restart: unless-stopped
+  defectdojo-celerybeat:
+    profiles: [defectdojo]
+    image: docker.io/defectdojo/defectdojo-django:${DEFECTDOJO_VERSION}
+    depends_on:
+      defectdojo-initializer: {condition: service_completed_successfully}
+      defectdojo-valkey: {condition: service_started}
+    entrypoint: ['/wait-for-it.sh', 'defectdojo-postgres:5432', '-t', '30', '--', '/entrypoint-celery-beat.sh']
+    environment: *dd-env
+    restart: unless-stopped
+  defectdojo-celeryworker:
+    profiles: [defectdojo]
+    image: docker.io/defectdojo/defectdojo-django:${DEFECTDOJO_VERSION}
+    depends_on:
+      defectdojo-initializer: {condition: service_completed_successfully}
+      defectdojo-valkey: {condition: service_started}
+    entrypoint: ['/wait-for-it.sh', 'defectdojo-postgres:5432', '-t', '30', '--', '/entrypoint-celery-worker.sh']
+    environment: *dd-env
+    volumes: [defectdojo_media:/app/media]
+    restart: unless-stopped
+  defectdojo-nginx:
+    profiles: [defectdojo]
+    image: docker.io/defectdojo/defectdojo-nginx:${DEFECTDOJO_VERSION}
+    depends_on:
+      defectdojo-uwsgi: {condition: service_started}
+    environment:
+      DD_UWSGI_HOST: defectdojo-uwsgi
+      DD_UWSGI_PORT: "3031"
+      NGINX_METRICS_ENABLED: "false"
+    ports: ["${DEFECTDOJO_BIND:-127.0.0.1}:${DEFECTDOJO_PORT:-8100}:8080"]     # localhost only unless platform-up.sh --expose
+    volumes: [defectdojo_media:/usr/share/nginx/html/media]
+    restart: unless-stopped
+  # ---- Dependency-Track (profile: dtrack): watches the SBOMs of every app and alerts on new vulnerabilities.
+  dtrack-postgres:
+    profiles: [dtrack]
+    image: ${DTRACK_POSTGRES_IMAGE}
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: dtrack
+      POSTGRES_PASSWORD: ${DTRACK_DB_PASSWORD:-}
+    volumes: [dtrack_postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtrack -d dtrack"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+  dtrack-apiserver:
+    profiles: [dtrack]
+    image: dependencytrack/apiserver:${DTRACK_VERSION}
+    depends_on:
+      dtrack-postgres: {condition: service_healthy}
+    environment:
+      ALPINE_DATABASE_MODE: external
+      ALPINE_DATABASE_URL: jdbc:postgresql://dtrack-postgres:5432/dtrack
+      ALPINE_DATABASE_DRIVER: org.postgresql.Driver
+      ALPINE_DATABASE_USERNAME: dtrack
+      ALPINE_DATABASE_PASSWORD: ${DTRACK_DB_PASSWORD:-}
+    deploy: {resources: {limits: {memory: 4g}}}
+    ports: ["${DTRACK_BIND:-127.0.0.1}:${DTRACK_API_PORT:-8111}:8080"]
+    volumes: [dtrack_data:/data]
+    restart: unless-stopped
+  dtrack-frontend:
+    profiles: [dtrack]
+    image: dependencytrack/frontend:${DTRACK_VERSION}
+    depends_on:
+      dtrack-apiserver: {condition: service_healthy}
+    environment:
+      API_BASE_URL: ${DTRACK_API_PUBLIC_URL:-http://localhost:8111}      # must be reachable from people's browsers
+    ports: ["${DTRACK_BIND:-127.0.0.1}:${DTRACK_PORT:-8110}:8080"]
+    restart: unless-stopped
+volumes: {sonar_db: {}, sonar_data: {}, sonar_ext: {}, sonar_logs: {}, dashboard_data: {}, defectdojo_postgres: {}, defectdojo_media: {}, defectdojo_redis: {}, dtrack_postgres: {}, dtrack_data: {}}

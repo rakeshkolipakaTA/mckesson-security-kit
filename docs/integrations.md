@@ -1,5 +1,7 @@
 # Setup and integration guide: SonarQube, the dashboard, tokens, and where each value goes
 
+> **Per-tool guides, for developers and for the platform team:** [integrations/](integrations/README.md) covers SonarQube, **DefectDojo** and **Dependency-Track**. This page remains the reference for where each URL and secret goes (GitHub, Jenkins, Azure DevOps) and for the dashboard, tickets and alerts.
+
 Three kinds of values exist. Putting each in the right place is the whole job.
 
 | Kind | Examples | Where it goes | Why |

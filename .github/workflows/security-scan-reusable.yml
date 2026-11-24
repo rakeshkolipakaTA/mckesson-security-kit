@@ -12,6 +12,8 @@ on:
     secrets:
       SONAR_TOKEN:    {required: false}
       WARDEN_DASHBOARD_TOKEN: {required: false, description: "Publishes the result to the central dashboard (URL comes from configs/central.env or config.env)"}
+      DEFECTDOJO_TOKEN: {required: false, description: "Publishes findings to DefectDojo (URL: SEC_DEFECTDOJO_URL)"}
+      DTRACK_API_KEY: {required: false, description: "Uploads the SBOM to Dependency-Track (URL: SEC_DTRACK_URL)"}
       NVD_API_KEY:    {required: false}
       FRAMEWORK_TOKEN: {required: false, description: "Token that can read the templates repo, only if it is private/internal"}
 permissions:
@@ -44,6 +46,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}
+          DEFECTDOJO_TOKEN: ${{ secrets.DEFECTDOJO_TOKEN }}
+          DTRACK_API_KEY: ${{ secrets.DTRACK_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ${{ runner.temp }}/warden-framework/scripts/scan.sh "$GITHUB_WORKSPACE" --out "$RUNNER_TEMP/warden-report"
       - name: Show results in GitHub (run summary, file markers, pull request comment)

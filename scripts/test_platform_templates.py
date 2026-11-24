@@ -138,6 +138,43 @@ def test_relative_links_in_the_new_docs_resolve():
     assert not bad, bad
 
 
+def test_defectdojo_and_dependency_track_are_opt_in_local_only_and_pinned():
+    c = yaml.safe_load(open(os.path.join(ROOT, "docker", "docker-compose.yml")))
+    env = dict(l.strip().split("=", 1) for l in open(os.path.join(ROOT, "versions.env")) if "=" in l and not l.startswith("#"))
+    svc = {k: v for k, v in c["services"].items() if k.startswith(("defectdojo-", "dtrack-"))}
+    assert len(svc) == 10, sorted(svc)
+    for name, v in svc.items():
+        assert v.get("profiles") in (["defectdojo"], ["dtrack"]), name                       # never started by a plain `docker compose up`
+        img = v["image"]
+        assert "latest" not in img, (name, img)                                              # every image is a pinned version (variable from versions.env)
+        for var in re.findall(r"\$\{(\w+)\}", img):
+            assert env.get(var) and "latest" not in env[var], (name, var)
+        for port in v.get("ports", []):
+            assert str(port).startswith("${DEFECTDOJO_BIND:-127.0.0.1}") or str(port).startswith("${DTRACK_BIND:-127.0.0.1}"), (name, port)   # localhost unless --expose
+    text = open(os.path.join(ROOT, "docker", "docker-compose.yml")).read()
+    for secret in ("DEFECTDOJO_DB_PASSWORD", "DEFECTDOJO_SECRET_KEY", "DEFECTDOJO_AES_KEY", "DEFECTDOJO_ADMIN_PASSWORD", "DTRACK_DB_PASSWORD"):
+        assert "${%s:-}" % secret in text and not re.search(r"\$\{%s:-\w" % secret, text), secret   # no built-in default credential
+    assert "registry.defectdojo.com" not in text and "docker.io/defectdojo" in text                  # the vendor registry logs which organisation pulls
+    assert yaml.safe_load(text)["services"]["db"]["restart"] == "unless-stopped"                     # SonarQube's database must come back after a reboot
+
+
+def test_platform_up_and_bootstraps_exist_and_never_print_secrets():
+    for f in ("platform-up.sh", "defectdojo-bootstrap.sh", "dtrack-bootstrap.sh"):
+        t = open(os.path.join(ROOT, "scripts", f)).read()
+        assert subprocess.run(["bash", "-n", os.path.join(ROOT, "scripts", f)]).returncode == 0, f
+        assert 'echo "$DEFECTDOJO_ADMIN_PASSWORD' not in t and 'echo "$DTRACK_ADMIN_PASSWORD' not in t and 'echo "$APW' not in t and 'echo "$PW"' not in t, f
+    assert "--expose" in open(os.path.join(ROOT, "scripts", "platform-up.sh")).read()
+
+
+def test_ci_templates_pass_the_new_secrets_without_values():
+    for f in ("github-actions-pr.yml", "github-actions-release.yml"):
+        t = open(os.path.join(TPL, f)).read()
+        assert "DEFECTDOJO_TOKEN: ${{ secrets.DEFECTDOJO_TOKEN }}" in t and "DTRACK_API_KEY: ${{ secrets.DTRACK_API_KEY }}" in t, f
+    cfg = open(os.path.join(TPL, "config.env")).read()
+    assert "SEC_DEFECTDOJO_URL" in cfg and "SEC_DTRACK_URL" in cfg
+    assert not re.search(r"^(DEFECTDOJO_TOKEN|DTRACK_API_KEY)\s*=", cfg, re.M)                      # secrets are never in config.env
+
+
 if __name__ == "__main__":
     n = fail = 0
     for name, fn in sorted(globals().items()):

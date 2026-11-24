@@ -30,6 +30,8 @@ _AI agents:_ see [docs/agentic-security.md](docs/agentic-security.md): agent-spe
 | Gate + reports | `scripts/gate.py`: dedupe across tools, baseline, exceptions, severity policy; HTML, markdown, JSON, SARIF |
 
 ## What we test
+Category by category, with what each check looks for and how it protects: **[docs/checks/](docs/checks/README.md)** (secrets, code analysis, dependencies, containers and IaC, dynamic testing, supply chain, AI agents, gate and reporting, workflow and process).
+
 Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test-coverage.xlsx)** (Excel) or [docs/test-coverage.md](docs/test-coverage.md). Both are generated from one data file (`tools/coverage_data.py`).
 
 <!-- coverage:start -->
@@ -37,31 +39,44 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 |---|---|---|---|
 | Secrets | Is a password, token or key sitting in the code? | 6 | gitleaks (tree + git history), Trivy, Semgrep, agent-scan |
 | Code analysis (SAST) | Does our own code contain insecure patterns? | 6 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
-| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 6 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
+| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 7 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
 | Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 8 | Trivy (Dockerfile, Kubernetes/Helm, Terraform/CloudFormation, image, CIS), kubescape; cluster/cloud docs + template |
 | Dynamic testing (DAST) | Can a running app be attacked from outside? | 7 | OWASP ZAP (baseline, API, full, authenticated), Schemathesis, exposure scan |
 | Supply chain & CI/CD | Can our pipeline or our dependencies be tampered with? | 5 | zizmor, repo-settings check, Dependabot/Renovate, signing + Scorecard templates |
 | AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 29 | 17 Semgrep agent rules, 13 agent-scan checks, modelscan |
 | AI agent: red-team probes | Does a running agent resist real attack attempts? | 21 | 19 deterministic probes; DeepTeam (7 frameworks) and promptfoo templates |
 | AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 16 | agentsec (16 modules) |
-| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 13 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
+| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 14 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
 | Developer workflow | Catches problems on the developer's machine before CI. | 5 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **125** | 21 scanner tools plus the library and gate |
+| **Total** |  | **127** | 21 scanner tools plus the library and gate |
 
 **Coverage of the Agentic Security presentation:** 97 items checked: 47 covered, 47 partial, 3 not covered. Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). Roadmap: 16 done, 6 partly, 1 documented only, 7 planned (penetration-test gaps).
 <!-- coverage:end -->
 
 **What cyber security means:** protecting systems, applications and data from unauthorised access, damage or disruption, and being able to detect and recover when something goes wrong (confidentiality, integrity, availability). These scans cover the *application and delivery-pipeline* slice. Network, cloud posture, runtime detection and response, and people and process need other tools and activities; the prioritised list of what to add next is in the Roadmap sheet.
 
+## Integrations
+Results always show in GitHub with no server. Three optional tools can also receive each scan; each has a guide for developers (three steps: address in `config.env`, one CI secret, done) and for the platform team (start it, get the token). Details and a "which tool for which question" table: **[docs/integrations/](docs/integrations/README.md)**.
+
+| Tool | Job | Guide |
+|---|---|---|
+| **SonarQube** | Code quality and code-security review with a quality gate | [docs/integrations/sonarqube.md](docs/integrations/sonarqube.md) |
+| **DefectDojo** | One register of all findings across all repos: owners, deadlines, accepted risks, tickets | [docs/integrations/defectdojo.md](docs/integrations/defectdojo.md) |
+| **Dependency-Track** | Watches the SBOM of every app and alerts on new CVEs after release | [docs/integrations/dependency-track.md](docs/integrations/dependency-track.md) |
+
+```bash
+scripts/platform-up.sh --defectdojo --dtrack       # platform team: start them (localhost only until you add --expose)
+```
+
 ## Documentation
 | For | Read |
 |---|---|
 | **Developers** | [GETTING-STARTED](docs/GETTING-STARTED.md) · [reading reports](docs/reading-reports.md) · [fixing findings (cookbook)](docs/fixing-findings.md) · [baseline & exceptions](docs/exceptions-and-baseline.md) · [what runs per stack](docs/stacks.md) · [troubleshooting](docs/troubleshooting.md) |
 | **CI/CD** | [GitHub Actions](docs/ci-github-actions.md) · [Jenkins](docs/ci-jenkins.md) · [Azure DevOps](docs/ci-azure-devops.md) · [CD release gates & DAST](docs/cd-release-gates.md) |
-| **Team leads** | [configuration (presets, tool switches)](docs/configuration.md) · [setup & integration (Sonar URL, tokens, CI)](docs/integrations.md) · [dashboard](docs/dashboard.md) · [onboarding checklist](docs/onboarding-checklist.md) · [policy](docs/policy.md) |
-| **Platform / security team** | [setup & integration](docs/integrations.md) · [dashboard](docs/dashboard.md) · [platform setup](docs/platform-setup.md) · [central mode](docs/central-mode.md) · [per-project mode](docs/per-project-mode.md) · [tools](docs/tools.md) · [SonarQube](docs/sonar-setup.md) |
+| **Team leads** | [configuration (presets, tool switches)](docs/configuration.md) · [integrations: SonarQube, DefectDojo, Dependency-Track](docs/integrations/README.md) · [setup & integration (URLs, tokens, CI)](docs/integrations.md) · [dashboard](docs/dashboard.md) · [onboarding checklist](docs/onboarding-checklist.md) · [policy](docs/policy.md) |
+| **Platform / security team** | [integrations](docs/integrations/README.md) · [setup & integration](docs/integrations.md) · [dashboard](docs/dashboard.md) · [platform setup](docs/platform-setup.md) · [central mode](docs/central-mode.md) · [per-project mode](docs/per-project-mode.md) · [tools](docs/tools.md) · [SonarQube](docs/sonar-setup.md) |
 | **AI agents** | [agentic security overview + coverage map](docs/agentic-security.md) · [red teaming](docs/agentic-redteam.md) · [agentsec runtime library](docs/agentic-runtime-library.md) |
 | **Evidence** | [point-of-view deck (HTML, cyber security and VAPT)](docs/warden-pov-presentation.html) · [logged-in scans, SSO and test credentials](docs/zap-authentication.md) · [what we test, by category](docs/test-coverage.md) · [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
 

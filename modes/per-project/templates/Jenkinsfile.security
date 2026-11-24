@@ -8,6 +8,8 @@ stage('Security scan') {
         // Optional: also create a Secret text credential 'warden-dashboard-token' and add
         //   string(credentialsId: 'warden-dashboard-token', variable: 'WARDEN_DASHBOARD_TOKEN')
         // inside withCredentials([...]) to publish each result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env).
+        // Same way for DefectDojo (variable DEFECTDOJO_TOKEN, URL SEC_DEFECTDOJO_URL) and Dependency-Track (variable DTRACK_API_KEY, URL SEC_DTRACK_URL):
+        // see docs/integrations/.
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
             sh '.security/warden scan'
         }

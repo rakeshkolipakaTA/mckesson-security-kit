@@ -17,6 +17,7 @@ python3 -I scripts/test_platform_templates.py >"$T/ptpl.log" 2>&1; check "platfo
 python3 -I scripts/test_gh_report.py >"$T/ghr.log" 2>&1; check "GitHub reporting: summary, annotations, one PR comment (mock API)" 0 $?; cp "$T/ghr.log" "$T/last.log"
 python3 -I scripts/test_zap_auth.py >"$T/zauth.log" 2>&1; check "ZAP login types: basic, cookie, JSON, form, OAuth2 / SSO token flows (mock app + identity provider)" 0 $?; cp "$T/zauth.log" "$T/last.log"
 python3 -I scripts/test_creds.py >"$T/creds.log" 2>&1; check "local test-credential store (outside git, mode 600, profiles)" 0 $?; cp "$T/creds.log" "$T/last.log"
+python3 -I scripts/test_publish_external.py >"$T/pubext.log" 2>&1; check "publish to DefectDojo and Dependency-Track (mock servers: reimport, SBOM upload, branch filter, failures, no secret echo)" 0 $?; cp "$T/pubext.log" "$T/last.log"
 python3 -W ignore -I agentic/tests/test_agentsec_extra.py >"$T/agentx.log" 2>&1; check "agentsec extras (output integrity, classification, retention, secrets, PIP/PAP)" 0 $?; cp "$T/agentx.log" "$T/last.log"
 python3 -W ignore -I agentic/tests/test_sandbox_docker.py >"$T/sandbox.log" 2>&1; check "agent code sandbox contains hostile code (real Docker)" 0 $?; cp "$T/sandbox.log" "$T/last.log"
 python3 -I scripts/test_dashboard.py >"$T/dash.log" 2>&1; check "dashboard + publisher tests (auth, hostile input, ingest, views)" 0 $?; cp "$T/dash.log" "$T/last.log"

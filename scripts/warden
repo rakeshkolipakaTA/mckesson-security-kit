@@ -9,7 +9,7 @@
 #   warden config set KEY VALUE   change one setting in .security/config.env safely, e.g. config set SEC_PRESET standard | config set SEC_BANDIT off
 #   warden tickets [--apply]  create GitHub / Jira / Azure DevOps tickets for new + overdue Critical/High findings (dry run unless --apply; see docs/dashboard.md)
 #   warden ci-report         (GitHub Actions) show the latest scan inside GitHub: job summary, file annotations, one pull-request comment; no server needed
-#   warden publish           send the latest report to the central dashboard (CI does this automatically when SEC_DASHBOARD_URL is set)
+#   warden publish           send the latest report to the dashboard, DefectDojo and Dependency-Track (CI does this automatically when their SEC_*_URL is set)
 #   warden open              open the latest HTML report
 #   warden pull              download/build all scanner images now (so the first scan, or CI, is not slow)
 #   warden redteam --redteam-url URL   (agents) run the AI red-team probes against a RUNNING QA agent you own; needs REDTEAM_TOKEN for authenticated agents
@@ -151,7 +151,7 @@ case "$c" in
             [ "$ch" = pinned ] && echo "pinned to warden $v ($base@$ref). Commit .security/warden.lock. Move later with: warden upgrade --pin  (or warden pin)." || echo "following the newest $ref release automatically. Commit .security/warden.lock.";;
   ci-report) rep="$(sec_dir)/reports/latest"; [ -d "$rep" ] || rep=reports/latest
             exec python3 -I "$ROOT/scripts/gh_report.py" --report "$rep" "$@";;
-  publish)  exec "$SCAN" $(target_args) --publish-latest;;
+  publish)  exec "$SCAN" $(target_args) --publish-latest "$@";;
   config)   cmd_config "$@";;
   disable)  cmd_disable "$@";;
   enable)   cmd_enable;;

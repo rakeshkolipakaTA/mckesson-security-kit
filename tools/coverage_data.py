@@ -87,7 +87,7 @@ INVENTORY = [
  ("AI agent: runtime controls (library)", "agentsec.guard", "Fail-closed guardrail enforcement (errors, timeouts, None all block)", "your agent code", "runtime", RL, ""),
  ("AI agent: runtime controls (library)", "agentsec.paths", "Safe path resolution (blocks traversal / symlink escape)", "your agent code", "runtime", RL, ""),
  ("AI agent: runtime controls (library)", "agentsec.egress", "Allow-listed outbound fetch, public IPs only, redirect re-validation, TLS", "your agent code", "runtime", RL, ""),
- ("AI agent: runtime controls (library)", "agentsec.pii", "Masks emails, phones, cards (Luhn), SSN, Aadhaar, PAN, tokens, keys", "your agent code", "runtime", RL, "Regex based: misses names and addresses"),
+ ("AI agent: runtime controls (library)", "agentsec.pii", "Masks emails, phones, cards (Luhn), SSN, Aadhaar, PAN, tokens, keys", "your agent code", "runtime", RL, "Regex based: names without an honorific and non-US address styles are not caught (Presidio is an option)"),
  ("AI agent: runtime controls (library)", "agentsec.limits", "Step / tool-call / time / output budgets and rate limiting", "your agent code", "runtime", RL, ""),
  ("AI agent: runtime controls (library)", "agentsec.untrusted", "Wraps retrieved content as data; heuristic injection detection", "your agent code", "runtime", RL, "Paraphrased injections pass the heuristic"),
  ("AI agent: runtime controls (library)", "agentsec.audit", "Hash-chained audit log, PII masked, tamper detection", "your agent code", "runtime", RL, "Ship to WORM storage / SIEM yourself"),
@@ -142,6 +142,8 @@ INVENTORY += [
  ("Developer workflow", "IDE recommendations (.vscode)", "Recommended Sonar / Semgrep extensions and settings written by warden init", "developer machine", "setup", TP, "Files validated; not exercised in an IDE"),
  ("Detection & response", "Falco rules for agent workloads", "Runtime detection: shells in agent containers, unexpected egress, credential-file reads and more", "Kubernetes nodes", "runtime", TP, "Falco's own validator accepts the 7 rules; never run on a live node"),
  ("Detection & response", "SIEM shipping recipe (Sentinel / Datadog)", "Forward Falco alerts and the agent audit log to the SIEM", "platform", "runtime", DOC, "Recipe in docs/runtime-detection.md; not a tested setup"),
+ ("Dependencies (SCA)", "Dependency-Track (SBOM monitoring)", "Uploads the SBOM of every main-branch scan; Dependency-Track keeps checking it against OSV, GitHub advisories and NVD and alerts on NEW vulnerabilities after release", "all stacks with manifests", "every scan on main", VP, "Tested on a real Dependency-Track 4.14.7 (project created, 9 components, 39 vulnerabilities found once OSV loaded; the CI key cannot administer the server). Not yet run from a GitHub Actions runner against a private-network server"),
+ ("Gate, policy & reporting", "DefectDojo publishing (findings register)", "Sends the merged findings of every main-branch scan with a REIMPORT: new ones opened, fixed ones closed, accepted exceptions as risk accepted, no duplicates", "all", "every scan on main", VP, "Tested on a real DefectDojo 3.5.300 (first import, repeat import changes nothing, vanished finding closed, returning one reopened). The CI user must be a superuser (Community has no import-only role). Not yet run from a GitHub Actions runner against a private-network server"),
  ("Process & governance", "Process kit (9 documents)", "Threat-model template, incident-response runbook, access-review checklist, training plan, pen-test scope, secure code-review checklist, security-champions guide, vulnerability-management policy", "teams", "recurring", DOC, "Documents only: people have to run them; SLA numbers are tested against policy.json"),
 ]
 
@@ -167,7 +169,7 @@ INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the o
 
 # our own regression tests (what proves the framework works)
 SUITES = [
- ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store", 24),
+ ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing", 25),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
  ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script and roll", 89),
  ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs", 46),
@@ -180,6 +182,7 @@ SUITES = [
  ("scripts/test_zap_auth.py", "ZAP login types and SSO token flows against a mock app and identity provider; secrets from files and prompt; no echo of secrets", 17),
  ("scripts/test_creds.py", "Local credential store: names only in lists, mode 600, profiles, refuses git working trees", 4),
  ("scripts/test_gh_report.py", "GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API)", 17),
+ ("scripts/test_publish_external.py", "DefectDojo reimport and Dependency-Track SBOM upload against mock servers: field mapping, branch filter, failures are warnings, no secret echo, dry run (unit)", 15),
  ("scripts/test_tools.py", "Exposure, repo-posture and API-fuzz helpers (unit)", 7),
  ("agentic/tests/test_agentsec.py", "Runtime-controls library (unit)", 24),
  ("agentic/tests/test_agentsec_extra.py", "Lineage, classification, retention, encrypted store, policy admin, network egress (unit)", 54),

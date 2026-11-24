@@ -38,6 +38,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           WARDEN_GIT_TOKEN: ${{ github.token }}   # used ONLY when you turn on git-history scanning (SEC_GITLEAKS_HISTORY=on): fetches the last SEC_HISTORY_COMMITS commits, no full clone
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+          DEFECTDOJO_TOKEN: ${{ secrets.DEFECTDOJO_TOKEN }}   # optional: findings register (URL: SEC_DEFECTDOJO_URL in config.env). Only main/master runs publish. docs/integrations/defectdojo.md
+          DTRACK_API_KEY: ${{ secrets.DTRACK_API_KEY }}   # optional: SBOM monitor (URL: SEC_DTRACK_URL in config.env). docs/integrations/dependency-track.md
       - name: Show results in GitHub (run summary, file markers, pull request comment)
         if: always()
         run: .security/warden ci-report

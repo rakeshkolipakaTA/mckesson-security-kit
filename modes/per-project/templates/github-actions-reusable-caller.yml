@@ -19,3 +19,4 @@ jobs:
     secrets:                  # pass only what is needed (delete the ones you do not use)
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}
+      # From release 1.1.0 on (point `uses:` and framework-ref at a release SHA first), also: DEFECTDOJO_TOKEN, DTRACK_API_KEY

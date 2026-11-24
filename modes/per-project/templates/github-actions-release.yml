@@ -27,6 +27,8 @@ jobs:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           WARDEN_DASHBOARD_TOKEN: ${{ secrets.WARDEN_DASHBOARD_TOKEN }}   # optional: publishes the result to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+          DEFECTDOJO_TOKEN: ${{ secrets.DEFECTDOJO_TOKEN }}   # optional: findings register (URL: SEC_DEFECTDOJO_URL in config.env). Only main/master runs publish. docs/integrations/defectdojo.md
+          DTRACK_API_KEY: ${{ secrets.DTRACK_API_KEY }}   # optional: SBOM monitor (URL: SEC_DTRACK_URL in config.env). docs/integrations/dependency-track.md
       - name: Show results on the run page
         if: always()
         run: .security/warden ci-report --no-comment

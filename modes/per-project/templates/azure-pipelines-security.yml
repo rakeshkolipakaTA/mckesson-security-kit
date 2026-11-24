@@ -18,6 +18,8 @@ steps:
     #   SONAR_HOST_URL: $(SONAR_HOST_URL)
     #   SONAR_TOKEN: $(SONAR_TOKEN)
     #   WARDEN_DASHBOARD_TOKEN: $(WARDEN_DASHBOARD_TOKEN)   # optional: publish to the central dashboard (URL: SEC_DASHBOARD_URL in config.env)
+    #   DEFECTDOJO_TOKEN: $(DEFECTDOJO_TOKEN)               # optional: DefectDojo (URL: SEC_DEFECTDOJO_URL). docs/integrations/defectdojo.md
+    #   DTRACK_API_KEY: $(DTRACK_API_KEY)                   # optional: Dependency-Track (URL: SEC_DTRACK_URL). docs/integrations/dependency-track.md
   - script: |
       f=$(find .security/reports -maxdepth 2 -name summary.md | sort | tail -1)
       [ -n "$f" ] && echo "##vso[task.uploadsummary]$PWD/$f"

@@ -17,7 +17,9 @@
 #   new checks (all SEC_<TOOL>=auto|on|off): GITLEAKS_HISTORY (secrets in past commits), SBOM, WORKFLOW_SCAN (GitHub Actions security), K8S_POSTURE,
 #                           API_FUZZ (needs SEC_API_SPEC=<openapi url>), EXPOSURE (needs SEC_EXPOSURE_TARGETS=<urls/hosts you own>), REPO_POSTURE (needs GITHUB_TOKEN)
 #   --partial               an intentionally incomplete local run (warden quick): required tools may be skipped
-#   --publish-latest        send the newest report to the dashboard (needs SEC_DASHBOARD_URL + WARDEN_DASHBOARD_TOKEN)
+#   --dry-run               with --publish-latest: show what would be sent to DefectDojo / Dependency-Track and contact nobody (warden publish --dry-run)
+#   --publish-latest        send the newest report to the dashboard, DefectDojo and Dependency-Track (whichever has its URL set: SEC_DASHBOARD_URL,
+#                           SEC_DEFECTDOJO_URL, SEC_DTRACK_URL; secrets WARDEN_DASHBOARD_TOKEN, DEFECTDOJO_TOKEN, DTRACK_API_KEY)
 #   --explain               print which tools would run and why, then exit (warden config show)
 #   --exclude a,b           SEC_EXCLUDE_PATHS  path globs whose code findings (not dependency CVEs) are left out of the result, e.g. vendor/**,legacy/**
 #   --no-semgrep            (same as --skip semgrep)
@@ -43,7 +45,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/versions.env"
 
-REPO="" OUT="" SEC_DIR_ARG="" BASELINE="" WRITE_BASELINE=0 PRINT_PROFILES=0 EXPLAIN=0 PARTIAL=0 PUBLISH_LATEST=0
+REPO="" OUT="" SEC_DIR_ARG="" BASELINE="" WRITE_BASELINE=0 PRINT_PROFILES=0 EXPLAIN=0 PARTIAL=0 PUBLISH_LATEST=0 PUBLISH_DRY=
 while [ $# -gt 0 ]; do
   case "$1" in
     --profile) SEC_PROFILE="$2"; shift 2;; --gate) SEC_GATE="$2"; shift 2;; --enforce) SEC_ENFORCE=1; shift;;
@@ -53,7 +55,7 @@ while [ $# -gt 0 ]; do
     --zap-network) SEC_ZAP_NETWORK="$2"; shift 2;; --zap-openapi) SEC_ZAP_OPENAPI="$2"; shift 2;;
     --baseline) BASELINE="$2"; shift 2;; --write-baseline) WRITE_BASELINE=1; shift;;
     --redteam-url) SEC_REDTEAM_URL="$2"; shift 2;; --redteam-network) SEC_REDTEAM_NETWORK="$2"; shift 2;; --redteam-contract) SEC_REDTEAM_CONTRACT="$2"; shift 2;;
-    --preset) SEC_PRESET="$2"; shift 2;; --partial) PARTIAL=1; shift;; --explain) EXPLAIN=1; shift;; --publish-latest) PUBLISH_LATEST=1; shift;; --exclude) SEC_EXCLUDE_PATHS="$2"; shift 2;;
+    --preset) SEC_PRESET="$2"; shift 2;; --partial) PARTIAL=1; shift;; --explain) EXPLAIN=1; shift;; --publish-latest) PUBLISH_LATEST=1; shift;; --dry-run) PUBLISH_DRY=--dry-run; shift;; --exclude) SEC_EXCLUDE_PATHS="$2"; shift 2;;
     --print-profiles) PRINT_PROFILES=1; shift;; --sec-dir) SEC_DIR_ARG="$2"; shift 2;; --out) OUT="$2"; shift 2;;
     -h|--help) sed -n '2,44p' "$0"; exit 0;;
     -*) echo "unknown option $1 (see --help)" >&2; exit 2;; *) REPO="$1"; shift;;
@@ -69,7 +71,7 @@ REPO="$(cd "$REPO" && pwd)"; NAME="$(basename "$REPO")"
 SEC_DIR="${SEC_DIR_ARG:-$REPO/.security}"; [ -d "$SEC_DIR" ] && SEC_DIR="$(cd "$SEC_DIR" && pwd)"
 
 # ---- config.env: parsed, never sourced (a pull request must not be able to run code on the scanner) ----
-CONFIG_KEYS=" SEC_ZAP_AUTH SEC_ZAP_LOGIN_URL SEC_ZAP_LOGIN_PAGE SEC_ZAP_USER_FIELD SEC_ZAP_PASSWORD_FIELD SEC_ZAP_CSRF_FIELD SEC_ZAP_LOGIN_EXTRA SEC_ZAP_TOKEN_PATH SEC_ZAP_OAUTH_SCOPE SEC_ZAP_OAUTH_AUDIENCE SEC_ZAP_OAUTH_CLIENT_AUTH SEC_CREDENTIALS_PROFILE SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
+CONFIG_KEYS=" SEC_ZAP_AUTH SEC_ZAP_LOGIN_URL SEC_ZAP_LOGIN_PAGE SEC_ZAP_USER_FIELD SEC_ZAP_PASSWORD_FIELD SEC_ZAP_CSRF_FIELD SEC_ZAP_LOGIN_EXTRA SEC_ZAP_TOKEN_PATH SEC_ZAP_OAUTH_SCOPE SEC_ZAP_OAUTH_AUDIENCE SEC_ZAP_OAUTH_CLIENT_AUTH SEC_CREDENTIALS_PROFILE SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DEFECTDOJO_URL SEC_DEFECTDOJO_PRODUCT SEC_DEFECTDOJO_PRODUCT_TYPE SEC_DEFECTDOJO_BRANCHES SEC_DTRACK_URL SEC_DTRACK_PROJECT SEC_DTRACK_BRANCHES SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
 load_config() {
   local line k v
   while IFS= read -r line || [ -n "$line" ]; do
@@ -90,9 +92,11 @@ load_config() {
 # organisation-wide defaults set once by the platform team (SonarQube / dashboard URLs): lowest precedence, a repo's config.env wins
 [ -f "$HERE/configs/central.env" ] && load_config "$HERE/configs/central.env"
 if [ -z "${SONAR_HOST_URL:-}" ] && [ -n "${SEC_SONAR_HOST_URL:-}" ]; then export SONAR_HOST_URL="$SEC_SONAR_HOST_URL"; fi
+# DefectDojo / Dependency-Track settings are read by scripts/publish_external.py from the environment
+export SEC_DEFECTDOJO_URL SEC_DEFECTDOJO_PRODUCT SEC_DEFECTDOJO_PRODUCT_TYPE SEC_DEFECTDOJO_BRANCHES SEC_DTRACK_URL SEC_DTRACK_PROJECT SEC_DTRACK_BRANCHES
 # Test credentials for your own machine: ~/.config/warden/credentials[.PROFILE].env (outside the repo, mode 600; `warden creds set NAME`).
 # Only known names are read; anything already in the environment (CI secrets) wins. Parsed, never sourced.
-CRED_ALLOWED=" ZAP_AUTH_USER ZAP_AUTH_PASSWORD ZAP_AUTH_TOKEN ZAP_AUTH_HEADER ZAP_AUTH_COOKIE ZAP_OAUTH_CLIENT_ID ZAP_OAUTH_CLIENT_SECRET API_TEST_TOKEN REDTEAM_TOKEN SONAR_TOKEN WARDEN_DASHBOARD_TOKEN "
+CRED_ALLOWED=" ZAP_AUTH_USER ZAP_AUTH_PASSWORD ZAP_AUTH_TOKEN ZAP_AUTH_HEADER ZAP_AUTH_COOKIE ZAP_OAUTH_CLIENT_ID ZAP_OAUTH_CLIENT_SECRET API_TEST_TOKEN REDTEAM_TOKEN SONAR_TOKEN WARDEN_DASHBOARD_TOKEN DEFECTDOJO_TOKEN DTRACK_API_KEY "
 load_credentials() {
   local f line k v kf
   if [ -n "${WARDEN_CREDENTIALS_FILE:-}" ] && [ -z "${SEC_CREDENTIALS_PROFILE:-}" ]; then f="$WARDEN_CREDENTIALS_FILE"
@@ -155,8 +159,11 @@ elif [ -d "$HERE/.git" ]; then REPORT_BASE="$HERE/reports/$NAME"
 else REPORT_BASE="${XDG_CACHE_HOME:-$HOME/.cache}/warden/reports/$NAME"; fi
 if [ "$PUBLISH_LATEST" = 1 ]; then
   [ -f "$REPORT_BASE/latest/summary.json" ] || { echo "no report to publish yet: run a scan first" >&2; exit 1; }
-  [ -n "${SEC_DASHBOARD_URL:-}" ] || { echo "SEC_DASHBOARD_URL is not set (config.env or configs/central.env); see docs/dashboard.md" >&2; exit 2; }
-  exec python3 -I "$HERE/scripts/publish.py" --report "$REPORT_BASE/latest" --root "$REPO" --url "$SEC_DASHBOARD_URL" --strict
+  [ -n "${SEC_DASHBOARD_URL:-}${SEC_DEFECTDOJO_URL:-}${SEC_DTRACK_URL:-}" ] || { echo "nothing to publish to: set SEC_DASHBOARD_URL, SEC_DEFECTDOJO_URL and/or SEC_DTRACK_URL (config.env or configs/central.env); see docs/integrations/" >&2; exit 2; }
+  PRC=0
+  [ -z "${SEC_DASHBOARD_URL:-}" ] || [ -n "$PUBLISH_DRY" ] || python3 -I "$HERE/scripts/publish.py" --report "$REPORT_BASE/latest" --root "$REPO" --url "$SEC_DASHBOARD_URL" --strict || PRC=1
+  [ -z "${SEC_DEFECTDOJO_URL:-}${SEC_DTRACK_URL:-}" ] || python3 -I "$HERE/scripts/publish_external.py" --report "$REPORT_BASE/latest" --root "$REPO" --strict $PUBLISH_DRY || PRC=1
+  exit $PRC
 fi
 if [ "$PRINT_PROFILES" != 1 ] && [ "$EXPLAIN" != 1 ]; then
   mkdir -p "$REPORT_BASE"
@@ -221,6 +228,8 @@ if [ "$EXPLAIN" = 1 ]; then
   [ -n "$SEC_EXCLUDE_PATHS" ] && echo "  excluded paths (code findings only): $SEC_EXCLUDE_PATHS"
   echo "  sonarqube url: ${SONAR_HOST_URL:-not set}   token: $([ -n "${SONAR_TOKEN:-}" ] && echo set || echo 'not set (CI secret SONAR_TOKEN)')"
   echo "  dashboard url: ${SEC_DASHBOARD_URL:-not set}   token: $([ -n "${WARDEN_DASHBOARD_TOKEN:-}" ] && echo set || echo 'not set (CI secret WARDEN_DASHBOARD_TOKEN)')"
+  echo "  defectdojo url: ${SEC_DEFECTDOJO_URL:-not set}   token: $([ -n "${DEFECTDOJO_TOKEN:-}" ] && echo set || echo 'not set (CI secret DEFECTDOJO_TOKEN)')   branches: ${SEC_DEFECTDOJO_BRANCHES:-main,master}"
+  echo "  dependency-track url: ${SEC_DTRACK_URL:-not set}   key: $([ -n "${DTRACK_API_KEY:-}" ] && echo set || echo 'not set (CI secret DTRACK_API_KEY)')   branches: ${SEC_DTRACK_BRANCHES:-main,master}"
   exit "$CONFIG_ERR"
 fi
 [ "$CONFIG_ERR" = 0 ] || exit 2
@@ -585,6 +594,7 @@ fi
 python3 -I "$HERE/scripts/gate.py" "${ARGS[@]}" $ENFORCE
 RC=$?
 if [ -n "${SEC_DASHBOARD_URL:-}" ] && [ -f "$OUT/summary.json" ]; then python3 -I "$HERE/scripts/publish.py" --report "$OUT" --root "$REPO" --url "$SEC_DASHBOARD_URL" || true; fi
+if [ -n "${SEC_DEFECTDOJO_URL:-}${SEC_DTRACK_URL:-}" ] && [ -f "$OUT/summary.json" ]; then python3 -I "$HERE/scripts/publish_external.py" --report "$OUT" --root "$REPO" || true; fi
 echo "   report: $OUT/summary.html   (also summary.md, results.sarif, raw/)"
 [ "$RC" = 0 ] && [ -z "$ENFORCE" ] && grep -q '"result": "FAIL' "$OUT/summary.json" 2>/dev/null && echo "   report-only mode: the gate WOULD have failed. Fix the findings, or baseline legacy ones (warden baseline), then switch the preset: warden config set SEC_PRESET standard."
 exit $RC

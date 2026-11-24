@@ -1,6 +1,6 @@
 # What we test: coverage by category
 
-Generated from `tools/coverage_data.py` on 2026-11-20. The same data is in [security-test-coverage.xlsx](security-test-coverage.xlsx) (filterable, with roadmap and glossary).
+Generated from `tools/coverage_data.py` on 2026-11-24. The same data is in [security-test-coverage.xlsx](security-test-coverage.xlsx) (filterable, with roadmap and glossary).
 
 ## 1. Categories and how many checks each has
 
@@ -8,18 +8,18 @@ Generated from `tools/coverage_data.py` on 2026-11-20. The same data is in [secu
 |---|---|---|---|
 | Secrets | Is a password, token or key sitting in the code? | 6 | gitleaks (tree + git history), Trivy, Semgrep, agent-scan |
 | Code analysis (SAST) | Does our own code contain insecure patterns? | 6 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
-| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 6 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
+| Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 7 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
 | Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 8 | Trivy (Dockerfile, Kubernetes/Helm, Terraform/CloudFormation, image, CIS), kubescape; cluster/cloud docs + template |
 | Dynamic testing (DAST) | Can a running app be attacked from outside? | 7 | OWASP ZAP (baseline, API, full, authenticated), Schemathesis, exposure scan |
 | Supply chain & CI/CD | Can our pipeline or our dependencies be tampered with? | 5 | zizmor, repo-settings check, Dependabot/Renovate, signing + Scorecard templates |
 | AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 29 | 17 Semgrep agent rules, 13 agent-scan checks, modelscan |
 | AI agent: red-team probes | Does a running agent resist real attack attempts? | 21 | 19 deterministic probes; DeepTeam (7 frameworks) and promptfoo templates |
 | AI agent: runtime controls (library) | Reusable code that gives an agent guardrails, authorisation, audit. | 16 | agentsec (16 modules) |
-| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 13 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
+| Gate, policy & reporting | Decides pass/fail, reports and tracks results. | 14 | gate.py, crosswalk, SLA, dashboard, alerts, tickets |
 | Developer workflow | Catches problems on the developer's machine before CI. | 5 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **125** | 21 scanner tools plus the library, gate and process kit |
+| **Total** |  | **127** | 21 scanner tools plus the library, gate and process kit |
 
 A *check* is one rule, probe or control we can name. Scanner tools such as Semgrep contain thousands of rules; they are counted once. Categories 1-8 find problems (scanners, probes, template/doc checks); the rest are controls you embed, decision logic and process.
 
@@ -28,7 +28,7 @@ A *check* is one rule, probe or control we can name. Scanner tools such as Semgr
 | Status | Meaning | Count |
 |---|---|---|
 | Verified | run end to end in this repo or on a real app | 92 |
-| Verified (partial) | run, with a stated limit | 7 |
+| Verified (partial) | run, with a stated limit | 9 |
 | Wired, not run | wired up but never run (needs a key) | 1 |
 | Template | shipped template, not run with a real LLM | 8 |
 | Reference library | working code with unit tests that you must wire into your platform | 14 |
@@ -109,7 +109,7 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 
 | Suite | What it proves | Checks |
 |---|---|---|
-| scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store | 24 |
+| scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing | 25 |
 | scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers | 83 |
 | scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script and roll | 89 |
 | scripts/test-newtools.sh | SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs | 46 |
@@ -122,9 +122,10 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | scripts/test_zap_auth.py | ZAP login types and SSO token flows against a mock app and identity provider; secrets from files and prompt; no echo of secrets | 17 |
 | scripts/test_creds.py | Local credential store: names only in lists, mode 600, profiles, refuses git working trees | 4 |
 | scripts/test_gh_report.py | GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API) | 17 |
+| scripts/test_publish_external.py | DefectDojo reimport and Dependency-Track SBOM upload against mock servers: field mapping, branch filter, failures are warnings, no secret echo, dry run (unit) | 15 |
 | scripts/test_tools.py | Exposure, repo-posture and API-fuzz helpers (unit) | 7 |
 | agentic/tests/test_agentsec.py | Runtime-controls library (unit) | 24 |
 | agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
 | agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
 | agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
-| **Total** |  | **489** |
+| **Total** |  | **505** |
