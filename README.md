@@ -40,7 +40,7 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | Secrets | Is a password, token or key sitting in the code? | 6 | gitleaks (tree + git history), Trivy, Semgrep, agent-scan |
 | Code analysis (SAST) | Does our own code contain insecure patterns? | 6 | Semgrep, Bandit, ESLint security, SonarQube (optional) |
 | Dependencies (SCA) | Do the libraries we use have known vulnerabilities? | 7 | pip-audit, npm audit, Trivy (CVEs, licences, SBOM), Dependency-Check (optional) |
-| Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 8 | Trivy (Dockerfile, Kubernetes/Helm, Terraform/CloudFormation, image, CIS), kubescape; cluster/cloud docs + template |
+| Container & IaC | Are Dockerfiles, images and Kubernetes manifests configured safely? | 10 | Trivy (Dockerfile, Kubernetes/Helm, Terraform/CloudFormation, image, CIS), kubescape; cluster/cloud docs + template |
 | Dynamic testing (DAST) | Can a running app be attacked from outside? | 7 | OWASP ZAP (baseline, API, full, authenticated), Schemathesis, exposure scan |
 | Supply chain & CI/CD | Can our pipeline or our dependencies be tampered with? | 5 | zizmor, repo-settings check, Dependabot/Renovate, signing + Scorecard templates |
 | AI agent: static checks | Is the agent built unsafely (tools, guardrails, models, MCP, prompts)? | 29 | 17 Semgrep agent rules, 13 agent-scan checks, modelscan |
@@ -50,7 +50,7 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | Developer workflow | Catches problems on the developer's machine before CI. | 5 | pre-push hook, pre-commit, PR template, IDE recommendations |
 | Detection & response | Would we notice and react if something went wrong in production? | 2 | Falco rules (template), SIEM recipe |
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
-| **Total** |  | **127** | 21 scanner tools plus the library and gate |
+| **Total** |  | **129** | 21 scanner tools plus the library and gate |
 
 **Coverage of the Agentic Security presentation:** 97 items checked: 47 covered, 47 partial, 3 not covered. Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). Roadmap: 16 done, 6 partly, 1 documented only, 7 planned (penetration-test gaps).
 <!-- coverage:end -->
@@ -58,13 +58,14 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 **What cyber security means:** protecting systems, applications and data from unauthorised access, damage or disruption, and being able to detect and recover when something goes wrong (confidentiality, integrity, availability). These scans cover the *application and delivery-pipeline* slice. Network, cloud posture, runtime detection and response, and people and process need other tools and activities; the prioritised list of what to add next is in the Roadmap sheet.
 
 ## Integrations
-Results always show in GitHub with no server. Three optional tools can also receive each scan; each has a guide for developers (three steps: address in `config.env`, one CI secret, done) and for the platform team (start it, get the token). Details and a "which tool for which question" table: **[docs/integrations/](docs/integrations/README.md)**.
+Results always show in GitHub with no server. Optional tools can also receive each scan; each has a guide for developers (three steps: address in `config.env`, one CI secret, done) and for the platform team (start it, get the token). Details and a "which tool for which question" table: **[docs/integrations/](docs/integrations/README.md)**.
 
 | Tool | Job | Guide |
 |---|---|---|
 | **SonarQube** | Code quality and code-security review with a quality gate | [docs/integrations/sonarqube.md](docs/integrations/sonarqube.md) |
 | **DefectDojo** | One register of all findings across all repos: owners, deadlines, accepted risks, tickets | [docs/integrations/defectdojo.md](docs/integrations/defectdojo.md) |
 | **Dependency-Track** | Watches the SBOM of every app and alerts on new CVEs after release | [docs/integrations/dependency-track.md](docs/integrations/dependency-track.md) |
+| **Wiz** (needs a licence) | Wiz CLI scans in the pipeline (GitHub Actions, Azure DevOps) and the steps to connect Wiz to Azure | [docs/integrations/wiz.md](docs/integrations/wiz.md) |
 
 ```bash
 scripts/platform-up.sh --defectdojo --dtrack       # platform team: start them (localhost only until you add --expose)

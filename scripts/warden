@@ -10,6 +10,7 @@
 #   warden tickets [--apply]  create GitHub / Jira / Azure DevOps tickets for new + overdue Critical/High findings (dry run unless --apply; see docs/dashboard.md)
 #   warden ci-report         (GitHub Actions) show the latest scan inside GitHub: job summary, file annotations, one pull-request comment; no server needed
 #   warden publish           send the latest report to the dashboard, DefectDojo and Dependency-Track (CI does this automatically when their SEC_*_URL is set)
+#   warden wiz [--install] [--scans dir,iac,image] [--enforce]   run Wiz CLI scans when a Wiz licence is configured (WIZ_CLIENT_ID / WIZ_CLIENT_SECRET); nothing runs without one (docs/integrations/wiz.md)
 #   warden open              open the latest HTML report
 #   warden pull              download/build all scanner images now (so the first scan, or CI, is not slow)
 #   warden redteam --redteam-url URL   (agents) run the AI red-team probes against a RUNNING QA agent you own; needs REDTEAM_TOKEN for authenticated agents
@@ -162,6 +163,7 @@ case "$c" in
             cmd_uninstall --yes >/dev/null && exec "$ROOT/modes/per-project/install.sh" . "$@";;
   --version|-V|version) echo "warden ${WARDEN_VERSION:-$(cat "$ROOT/VERSION" 2>/dev/null | head -1)}"; l="$(lock_get version)"; ch="$(lock_get channel)"; [ "$ch" = auto ] && echo "this repo follows the newest release of $(lock_get source | sed 's/.*@//') automatically" || { [ -z "$l" ] || echo "this repo is pinned to $l"; };;
   hook)     cmd_hook "$@";;
+  wiz)      WARDEN_WIZ_ARGS="$*" exec "$SCAN" $(target_args) --wiz;;
   scan)     exec "$SCAN" $(target_args) "$@";;
   gate)     exec "$SCAN" $(target_args) --enforce "$@";;
   quick)    exec "$SCAN" $(target_args) --enforce --partial --skip trivy,pip-audit,npm-audit "$@";;

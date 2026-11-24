@@ -1,0 +1,42 @@
+# OPTIONAL: Wiz CLI scans of this repository: code and libraries ("dir"), Terraform / Kubernetes / ARM / Bicep files ("iac") and, if you set SEC_IMAGE, a built image.
+# Needs a Wiz LICENCE. Copy this file to .github/workflows/wiz.yml. Without the two secrets below the job does nothing and passes, so it is safe to keep.
+# Not tested against a real Wiz tenant: check docs/integrations/wiz.md first. Wiz shows the results in its own portal (policies are defined there);
+# if DefectDojo is configured (SEC_DEFECTDOJO_URL in config.env) the results are also imported into it on main.
+# Report-only by default. To block the build when a Wiz policy fails, set the repository variable WIZ_ENFORCE to 1.
+# Secrets (repo or organisation, Settings > Secrets and variables > Actions): WIZ_CLIENT_ID and WIZ_CLIENT_SECRET = a Wiz service account for the CLI.
+name: wiz
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+concurrency:
+  group: wiz-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  wiz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WIZ_CLIENT_ID: ${{ secrets.WIZ_CLIENT_ID }}          # empty on forks and when no licence is set up: the scan step is skipped
+      WIZ_CLIENT_SECRET: ${{ secrets.WIZ_CLIENT_SECRET }}
+      SEC_WIZ_ENFORCE: ${{ vars.WIZ_ENFORCE }}
+      # Pin the CLI for repeatable builds: use a version-specific URL from Wiz and its SHA-256 (the log prints the hash of what was downloaded).
+      # SEC_WIZCLI_URL: https://downloads.wiz.io/wizcli/<version>/wizcli-linux-amd64
+      # SEC_WIZCLI_SHA256: <sha256 of that file>
+      # SEC_WIZ_SCANS: dir,iac,image      # default dir,iac. The image scan needs SEC_IMAGE=name:tag and a built image in this job
+      # SEC_WIZ_POLICY: "My CI policy"    # optional: a policy name defined in the Wiz portal
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Wiz scan
+        if: env.WIZ_CLIENT_ID != '' && env.WIZ_CLIENT_SECRET != ''
+        run: .security/warden wiz --install
+        env:
+          DEFECTDOJO_TOKEN: ${{ secrets.DEFECTDOJO_TOKEN }}     # optional: import the Wiz results into DefectDojo (URL: SEC_DEFECTDOJO_URL in config.env)
+      - name: No Wiz licence configured
+        if: env.WIZ_CLIENT_ID == '' || env.WIZ_CLIENT_SECRET == ''
+        run: echo "Wiz skipped - add the secrets WIZ_CLIENT_ID and WIZ_CLIENT_SECRET to enable it (docs/integrations/wiz.md)"

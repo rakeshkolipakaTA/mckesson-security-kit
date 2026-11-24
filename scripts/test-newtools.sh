@@ -2,6 +2,7 @@
 # End-to-end test of the newer checks with real containers: git-history secrets (incl. shallow clone), SBOM, GitHub Actions security,
 # Kubernetes posture, compliance crosswalk, dated baseline + overdue SLA, API fuzzing, exposure scan. ~3 min, needs Docker + network.
 set -uo pipefail
+dlog_has() { local l; l="$(docker logs "$1" 2>&1)"; grep -q -- "$2" <<<"$l"; }   # not `docker logs | grep -q`: under pipefail an early-exiting grep -q kills docker logs (exit 141)
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$HERE"
 T="$(mktemp -d)"; PASS=0; FAILN=0
 NET=nt-net; APP=nt-app
@@ -105,7 +106,7 @@ http.server.ThreadingHTTPServer(("0.0.0.0", 8000), H).serve_forever()
 PY
 docker rm -f nt-auth >/dev/null 2>&1; docker run -d --name nt-auth --network "$NET" -v "$T/authsrv.py:/a.py:ro" python:3.12-slim python /a.py >/dev/null; sleep 2
 ZAP_AUTH_TOKEN=s3cr3t-token SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip gitleaks,trivy,semgrep,bandit,pip-audit --zap-url http://nt-auth:8000/ --out "$T/o6" >"$T/o6.log" 2>&1
-docker logs nt-auth 2>&1 | grep -q "AUTHHDR='Bearer s3cr3t-token'"; check "ZAP requests carried the bearer token" 0 $?
+dlog_has nt-auth "AUTHHDR='Bearer s3cr3t-token'"; check "ZAP requests carried the bearer token" 0 $?
 grep -q 'authenticated' "$T/o6.log"; check "the scan log says the scan was authenticated" 0 $?
 grep -q 's3cr3t-token' "$T/o6.log" "$T/o6/zap.log" 2>/dev/null; check "the token does not appear in the scan logs" 1 $?
 docker rm -f nt-auth >/dev/null 2>&1
@@ -140,11 +141,11 @@ docker rm -f nt-auth2 >/dev/null 2>&1; docker run -d --name nt-auth2 --network "
 mkdir -p "$T/creds"; ( umask 077; printf 'ZAP_AUTH_USER=tester\nZAP_AUTH_PASSWORD=S3cret!pw\n' > "$T/creds/credentials.env" )
 ZSKIP="gitleaks,trivy,semgrep,bandit,pip-audit"
 WARDEN_CREDENTIALS_FILE="$T/creds/credentials.env" SEC_ZAP_AUTH=login-json SEC_ZAP_LOGIN_URL=http://127.0.0.1:18765/login SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip "$ZSKIP" --zap-url http://nt-auth2:8000/ --out "$T/o9" >"$T/o9.log" 2>&1
-docker logs nt-auth2 2>&1 | grep -q "AUTHHDR='Bearer login-token-77'"; check "username + password login (credentials from the local file): ZAP carried the obtained token" 0 $?
+dlog_has nt-auth2 "AUTHHDR='Bearer login-token-77'"; check "username + password login (credentials from the local file): ZAP carried the obtained token" 0 $?
 grep -q 'login ok' "$T/o9.log"; check "the log says the login worked" 0 $?
 grep -q -e 'S3cret!pw' -e 'login-token-77' "$T/o9.log" "$T/o9/zap.log" 2>/dev/null; check "neither the password nor the token appears in the scan logs" 1 $?
 WARDEN_CREDENTIALS_FILE="$T/creds/credentials.env" SEC_ZAP_AUTH=form SEC_ZAP_LOGIN_URL=http://127.0.0.1:18765/form SEC_ZAP_LOGGED_OUT_REGEX='Invalid' SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip "$ZSKIP" --zap-url http://nt-auth2:8000/ --out "$T/o10" >"$T/o10.log" 2>&1
-docker logs nt-auth2 2>&1 | grep -q "COOKIE='sessionid=SESS42; theme=dark'"; check "form login: ZAP carried the session cookies" 0 $?
+dlog_has nt-auth2 "COOKIE='sessionid=SESS42; theme=dark'"; check "form login: ZAP carried the session cookies" 0 $?
 ZAP_AUTH_PASSWORD=wrong-pw-1 WARDEN_CREDENTIALS_FILE="$T/creds/credentials.env" SEC_ZAP_AUTH=login-json SEC_ZAP_LOGIN_URL=http://127.0.0.1:18765/login SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clean-python --partial --skip "$ZSKIP" --zap-url http://nt-auth2:8000/ --out "$T/o11" >"$T/o11.log" 2>&1; check "a wrong password does not break the scan run" 0 $?
 grep -q 'login failed' "$T/o11.log"; check "a failed login is reported, not silently skipped" 0 $?
 grep -q 'wrong-pw-1' "$T/o11.log"; check "and the wrong password is not echoed" 1 $?

@@ -1,0 +1,25 @@
+# OPTIONAL: Wiz CLI scans of this repository on Azure DevOps: code and libraries ("dir"), Terraform / Kubernetes / ARM / Bicep files ("iac"), and an image if SEC_IMAGE is set.
+# Needs a Wiz LICENCE. Pipelines > New pipeline > Existing Azure Pipelines YAML file > pick this file. Without the two secret variables the step does nothing and passes.
+# Not tested against a real Wiz tenant: see docs/integrations/wiz.md. Report-only unless the variable WIZ_ENFORCE is 1 (then a failed Wiz policy fails the build).
+# Variables (Pipelines > Library > Variable group, or pipeline variables; mark the secret ones as secret): WIZ_CLIENT_ID, WIZ_CLIENT_SECRET = a Wiz service account for the CLI.
+trigger:
+  branches:
+    include: [main, master]
+pr:
+  branches:
+    include: ['*']
+pool:
+  vmImage: ubuntu-latest        # or your self-hosted pool; the image scan also needs Docker
+steps:
+  - checkout: self
+  - script: .security/warden wiz --install
+    displayName: Wiz scan
+    condition: and(ne(variables['WIZ_CLIENT_ID'], ''), ne(variables['WIZ_CLIENT_SECRET'], ''))
+    env:
+      WIZ_CLIENT_ID: $(WIZ_CLIENT_ID)
+      WIZ_CLIENT_SECRET: $(WIZ_CLIENT_SECRET)      # secret variables are only available to a step when mapped like this
+      SEC_WIZ_ENFORCE: $(WIZ_ENFORCE)
+      # SEC_WIZCLI_URL: https://downloads.wiz.io/wizcli/<version>/wizcli-linux-amd64     # pin a version for repeatable builds
+      # SEC_WIZCLI_SHA256: <sha256 of that file>
+      # SEC_WIZ_SCANS: dir,iac,image                                                       # default dir,iac
+      # DEFECTDOJO_TOKEN: $(DEFECTDOJO_TOKEN)                                              # optional: import the results into DefectDojo (URL: SEC_DEFECTDOJO_URL)

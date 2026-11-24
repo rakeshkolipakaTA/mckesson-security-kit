@@ -14,6 +14,7 @@ Many incidents are not bugs in the application but **settings**: a container tha
 | **Trivy image scan** | A built Docker image | OS-package and library CVEs, **and secrets inside the image** | by CVE rating | release (after `docker build`, before push) |
 | **Trivy CIS Docker benchmark** | A built Docker image | Image configuration against the CIS Docker benchmark | advisory, Medium at most | release |
 | **Live cluster posture** (kubescape, kube-bench, `trivy k8s`) | The running cluster | RBAC, network policy, node configuration | by rule | scheduled; commands in [../cloud-and-cluster.md](../cloud-and-cluster.md) |
+| **Wiz** (optional, needs a licence) | Pipeline: the Wiz CLI scans code, IaC files and images (`warden wiz`). Cloud: Wiz scans running Azure subscriptions, AKS and registries, and shows attack paths. See [../integrations/wiz.md](../integrations/wiz.md) | by Wiz policy | PR / main (CLI); continuous (cloud) |
 | **Cloud account posture** (Prowler) | A cloud account | Public buckets, open security groups, public load balancers, weak IAM | by rule | scheduled; workflow template |
 
 ## How it protects
@@ -30,4 +31,4 @@ Each finding names the file and the setting to change, for example: run as a non
 * Static checks read what is **written**, not what is **deployed**. A cluster edited by hand, or a cloud account changed in the console, is only seen by the scheduled live checks, which are templates or documented commands here.
 * kubescape skips Helm templates it cannot render. Trivy's CIS check is not a full CIS audit of the host.
 * A scan of the image tells you about packages inside it, not about how it is run (see the Falco rules in [10-workflow-detection-process.md](10-workflow-detection-process.md)).
-* Status: **Verified** for the Dockerfile, Kubernetes, Terraform and CloudFormation checks (Terraform proven on `examples/iac-sample`), kubescape, the image scan and the CIS check. Live cluster posture is **documented, not run** (no cluster available). Prowler is a **template** (no cloud account available).
+* Status: **Verified** for the Dockerfile, Kubernetes, Terraform and CloudFormation checks (Terraform proven on `examples/iac-sample`), kubescape, the image scan and the CIS check. Live cluster posture is **documented, not run** (no cluster available). Prowler is a **template** (no cloud account available). Wiz is a **template**: the CLI wiring is tested with a stand-in and the DefectDojo import on a real server, but no Wiz tenant was available.

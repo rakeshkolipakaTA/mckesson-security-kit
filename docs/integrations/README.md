@@ -1,12 +1,13 @@
-# Integrations: SonarQube, DefectDojo and Dependency-Track
+# Integrations: SonarQube, DefectDojo, Dependency-Track and Wiz
 
-Warden scans a repository and always shows the result **inside GitHub** (run summary, markers on the changed lines, one pull request comment). That needs no server. Three optional tools can receive the same scan, each for a different job:
+Warden scans a repository and always shows the result **inside GitHub** (run summary, markers on the changed lines, one pull request comment). That needs no server. Optional tools can receive the same scan, each for a different job (Wiz is the odd one out: it is a licensed product that runs its own scans, see below):
 
 | Tool | Job | Who looks at it | What Warden sends | Guide |
 |---|---|---|---|---|
 | **SonarQube** | Code quality and code-security review, with its own quality gate | Developers, and the client who asked for it | The source code (analysed by Sonar's scanner) | [sonarqube.md](sonarqube.md) |
 | **DefectDojo** | One register of **all** findings from all Warden tools, across all repos: owners, deadlines, accepted risks, tickets, management reports | Security team, engineering leads | The findings of every scan (Secrets, SAST, SCA, IaC, DAST, agent checks) | [defectdojo.md](defectdojo.md) |
 | **Dependency-Track** | Keeps watching the libraries you shipped and alerts when a **new** CVE is published, even if nobody scans that week | Security team | The SBOM (bill of materials) of every scan | [dependency-track.md](dependency-track.md) |
+| **Wiz** (needs a licence) | Commercial cloud security platform. Pipeline: the Wiz CLI scans code, IaC files and images. Cloud: Wiz scans your running Azure environment and shows attack paths | Security and cloud teams | Nothing from Warden to Wiz: `warden wiz` runs the Wiz CLI, and its results can be imported into DefectDojo | [wiz.md](wiz.md) |
 
 You choose per repository which of them to use. A repository can use none, one, two or all three. Each is independent of the others, and none of them is needed for the scan itself.
 
@@ -23,6 +24,7 @@ Then run a scan on your main branch. The last lines of the scan say what was sen
 | SonarQube | `SEC_SONAR=on`, `SEC_SONAR_KEY=` (optional); the server address is set once in `configs/central.env` as `SEC_SONAR_HOST_URL` | `SONAR_TOKEN` | `SEC_SONAR=on` |
 | DefectDojo | `SEC_DEFECTDOJO_URL=https://defectdojo.example.com` | `DEFECTDOJO_TOKEN` | the URL is set |
 | Dependency-Track | `SEC_DTRACK_URL=https://dtrack-api.example.com` (the **API server** address) | `DTRACK_API_KEY` | the URL is set |
+| Wiz | `SEC_WIZ_SCANS=dir,iac` (optional); copy the Wiz workflow template | `WIZ_CLIENT_ID`, `WIZ_CLIENT_SECRET` | both secrets exist (no licence = the step is skipped) |
 
 Secrets are never written in `config.env`. If you put one there by mistake, Warden refuses it with a message. For your own machine use `warden creds set NAME`.
 
@@ -57,10 +59,11 @@ If a server is down, a secret is missing or a token is wrong, the scan prints on
 | Is my code clean, any smells or hot-spots in this project? | SonarQube |
 | What are **all** our open findings, who owns them, what is overdue, what did we accept? | DefectDojo |
 | A new CVE was announced in library X today: which of our apps use it? | Dependency-Track |
+| Is something in our running Azure environment exposed, and what could an attacker chain together? | Wiz (needs a licence) |
 | Which repos have no scan, or a failing gate, at a glance? | Warden dashboard (optional, lightweight), or DefectDojo |
 
 ## What each tool receives, and what is not sent
-* **Source code** goes only to SonarQube (its scanner reads the files). DefectDojo and Dependency-Track never receive your source.
+* **Source code** goes only to SonarQube (its scanner reads the files) and, if you use it, to Wiz (the Wiz CLI scans the checkout and talks to your Wiz tenant). DefectDojo and Dependency-Track never receive your source.
 * **DefectDojo** receives, per finding: severity, tool, rule, file path and line, title, fix hint, and Warden's fingerprint. Secrets are already redacted by the scanners. It does **not** receive raw tool output.
 * **Dependency-Track** receives the SBOM: package names and versions (and their licences), nothing else.
 

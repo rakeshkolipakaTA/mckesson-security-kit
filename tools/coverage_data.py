@@ -144,6 +144,8 @@ INVENTORY += [
  ("Detection & response", "SIEM shipping recipe (Sentinel / Datadog)", "Forward Falco alerts and the agent audit log to the SIEM", "platform", "runtime", DOC, "Recipe in docs/runtime-detection.md; not a tested setup"),
  ("Dependencies (SCA)", "Dependency-Track (SBOM monitoring)", "Uploads the SBOM of every main-branch scan; Dependency-Track keeps checking it against OSV, GitHub advisories and NVD and alerts on NEW vulnerabilities after release", "all stacks with manifests", "every scan on main", VP, "Tested on a real Dependency-Track 4.14.7 (project created, 9 components, 39 vulnerabilities found once OSV loaded; the CI key cannot administer the server). Not yet run from a GitHub Actions runner against a private-network server"),
  ("Gate, policy & reporting", "DefectDojo publishing (findings register)", "Sends the merged findings of every main-branch scan with a REIMPORT: new ones opened, fixed ones closed, accepted exceptions as risk accepted, no duplicates", "all", "every scan on main", VP, "Tested on a real DefectDojo 3.5.300 (first import, repeat import changes nothing, vanished finding closed, returning one reopened). The CI user must be a superuser (Community has no import-only role). Not yet run from a GitHub Actions runner against a private-network server"),
+ ("Container & IaC", "Wiz CLI scans in the pipeline (dir, iac, image)", "Wiz's own scan of code and libraries, Terraform / Kubernetes / ARM files and built images in GitHub Actions or Azure DevOps; results in the Wiz portal and, optionally, DefectDojo", "code, IaC files, images", "PR / main", TP, "Needs a Wiz licence. Warden's side tested with a stand-in wizcli (14 tests) and the DefectDojo import on a real server with Wiz sample files; never run against a real Wiz tenant"),
+ ("Container & IaC", "Wiz cloud scanning of Azure (connector guide)", "Wiz scans running Azure subscriptions, AKS, registries, identities and shows attack paths, once a connector is set up in the Wiz portal", "Azure cloud account", "continuous", DOC, "Guidance only (docs/integrations/wiz.md): done in the Wiz portal and Azure, exact roles come from Wiz; not run (no Wiz tenant)"),
  ("Process & governance", "Process kit (9 documents)", "Threat-model template, incident-response runbook, access-review checklist, training plan, pen-test scope, secure code-review checklist, security-champions guide, vulnerability-management policy", "teams", "recurring", DOC, "Documents only: people have to run them; SLA numbers are tested against policy.json"),
 ]
 
@@ -169,7 +171,7 @@ INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the o
 
 # our own regression tests (what proves the framework works)
 SUITES = [
- ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing", 25),
+ ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing, Wiz CLI runner", 26),
  ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
  ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script and roll", 89),
  ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs", 46),
@@ -182,7 +184,8 @@ SUITES = [
  ("scripts/test_zap_auth.py", "ZAP login types and SSO token flows against a mock app and identity provider; secrets from files and prompt; no echo of secrets", 17),
  ("scripts/test_creds.py", "Local credential store: names only in lists, mode 600, profiles, refuses git working trees", 4),
  ("scripts/test_gh_report.py", "GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API)", 17),
- ("scripts/test_publish_external.py", "DefectDojo reimport and Dependency-Track SBOM upload against mock servers: field mapping, branch filter, failures are warnings, no secret echo, dry run (unit)", 15),
+ ("scripts/test_publish_external.py", "DefectDojo reimport, Dependency-Track SBOM upload and Wiz result import against mock servers: field mapping, branch filter, failures are warnings, no secret echo, dry run (unit)", 18),
+ ("scripts/test_wiz_scan.py", "Wiz CLI runner with a stand-in wizcli: no licence runs nothing, commands, secrets never printed, policy failure vs error, enforcement, hash-checked install, warden wiz via scan.sh (unit)", 14),
  ("scripts/test_tools.py", "Exposure, repo-posture and API-fuzz helpers (unit)", 7),
  ("agentic/tests/test_agentsec.py", "Runtime-controls library (unit)", 24),
  ("agentic/tests/test_agentsec_extra.py", "Lineage, classification, retention, encrypted store, policy admin, network egress (unit)", 54),

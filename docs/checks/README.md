@@ -20,7 +20,7 @@ One page per category. Each page answers four questions:
 | 9 | Gate, policy and reporting | Who decides pass or fail, and how are results tracked? | [09-gate-policy-reporting.md](09-gate-policy-reporting.md) |
 | 10 | Developer workflow, detection and process | What catches problems before CI, in production, and in people's habits? | [10-workflow-detection-process.md](10-workflow-detection-process.md) |
 
-Optional tools that receive scan results (SonarQube, DefectDojo, Dependency-Track): [../integrations/](../integrations/README.md).
+Optional tools that receive scan results or add their own scans (SonarQube, DefectDojo, Dependency-Track, Wiz): [../integrations/](../integrations/README.md).
 
 The complete, filterable list with a status for every check is [../test-coverage.md](../test-coverage.md) and [../security-test-coverage.xlsx](../security-test-coverage.xlsx). To change what runs on one repo see [../configuration.md](../configuration.md).
 

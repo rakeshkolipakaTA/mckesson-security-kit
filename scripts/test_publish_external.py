@@ -216,6 +216,45 @@ def t_bad_url_and_nothing_configured():
     assert rc == 1 and "nothing to publish" in err
 
 
+def wiz_report(kinds=("dir", "iac", "image")):
+    d = report(sbom=False)
+    for k in kinds:
+        open(os.path.join(d, f"wizcli-{k}.json"), "w").write(json.dumps({"scan": k}))
+    return d
+
+
+def t_wiz_results_are_imported_with_defectdojos_own_wiz_parsers():
+    rc, out, err = run(wiz_report(), dtrack=False, args=("--only", "wiz"))
+    assert rc == 0, (out, err)
+    got = {c[4]["scan_type"]: (c[4]["test_title"], c[4]["product_name"], c[4]["engagement_name"], json.loads(c[5]["file"])) for c in calls("dojo")}
+    assert set(got) == {"Wizcli Dir Scan", "Wizcli IaC Scan", "Wizcli Img Scan"}, got.keys()
+    assert got["Wizcli IaC Scan"][:3] == ("Wiz CLI iac scan", "acme/shop", "main") and got["Wizcli Img Scan"][3] == {"scan": "image"}   # the file is sent unchanged
+    assert all(c[3]["Authorization"] == f"Token {DOJO_TOKEN}" and c[4]["close_old_findings"] == "true" for c in calls("dojo"))
+    assert not calls("dtrack")
+
+
+def t_wiz_import_only_sends_the_scans_that_ran_and_respects_branches():
+    rc, out, err = run(wiz_report(("dir",)), dtrack=False, args=("--only", "wiz"))
+    assert [c[4]["scan_type"] for c in calls("dojo")] == ["Wizcli Dir Scan"]
+    rc, out, err = run(wiz_report(), dtrack=False, args=("--only", "wiz"), branch="feature/x")
+    assert rc == 0 and "skipped" in out and not CALLS
+    rc, out, err = run(report(sbom=False), dtrack=False, args=("--only", "wiz"))
+    assert rc == 0 and "no Wiz CLI results" in out and not CALLS
+
+
+def t_wiz_import_failures_and_dry_run():
+    rc, out, err = run(wiz_report(), dtrack=False, args=("--only", "wiz", "--dry-run"))
+    assert rc == 0 and out.count("dry run") == 3 and not CALLS
+    rc, out, err = run(wiz_report(), dtrack=False, args=("--only", "wiz"), extra_env={"DEFECTDOJO_TOKEN": ""})
+    assert "DEFECTDOJO_TOKEN is not set" in err and not CALLS
+    BEHAVE["dojo"] = 401
+    try:
+        rc, out, err = run(wiz_report(), dtrack=False, args=("--only", "wiz", "--strict"))
+        assert rc == 1 and err.count("token rejected") == 3 and DOJO_TOKEN not in out + err
+    finally:
+        BEHAVE["dojo"] = 201
+
+
 TESTS = [(n, f) for n, f in sorted(globals().items()) if n.startswith("t_") and callable(f)]
 ok = 0
 for n, f in TESTS:

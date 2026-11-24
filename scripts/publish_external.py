@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Send a scan to DefectDojo (findings register) and Dependency-Track (SBOM monitor). Standard library only.
 
-  publish_external.py --report <report-dir> [--root <repo>] [--only dojo,dtrack] [--strict] [--dry-run]
+  publish_external.py --report <report-dir> [--root <repo>] [--only dojo,dtrack,wiz] [--strict] [--dry-run]
 
 Settings (not secret; config.env / configs/central.env / environment):
   SEC_DEFECTDOJO_URL             e.g. http://host:8100             -> DefectDojo is used when set
@@ -143,6 +143,50 @@ def publish_dojo(a, ctx):
     return err(a, f"defectdojo: {why}")
 
 
+# ------------------------------------------------------------------ Wiz CLI results -> DefectDojo (DefectDojo's own Wiz parsers)
+WIZ_SCAN_TYPES = {"dir": "Wizcli Dir Scan", "iac": "Wizcli IaC Scan", "image": "Wizcli Img Scan"}
+
+
+def publish_wiz(a, ctx):
+    """Import the JSON that `warden wiz` wrote (wizcli-<kind>.json) into the same DefectDojo product / engagement as the Warden findings."""
+    url, token = os.environ.get("SEC_DEFECTDOJO_URL", "").rstrip("/"), os.environ.get("DEFECTDOJO_TOKEN", "")
+    repo, branch, commit, run = ctx
+    if not url and not a.dry_run:
+        return err(a, "defectdojo: SEC_DEFECTDOJO_URL is not set; not sending the Wiz results")
+    if not a.strict and not branch_ok(branch, os.environ.get("SEC_DEFECTDOJO_BRANCHES")):
+        print(f"defectdojo: Wiz results skipped (branch '{branch}' is not in SEC_DEFECTDOJO_BRANCHES, default main,master)")
+        return True
+    files = [(k, os.path.join(a.report, f"wizcli-{k}.json")) for k in WIZ_SCAN_TYPES]
+    files = [(k, f) for k, f in files if os.path.isfile(f) and os.path.getsize(f) > 0]
+    if not files:
+        print("defectdojo: no Wiz CLI results to send (run `warden wiz` first)")
+        return True
+    product = os.environ.get("SEC_DEFECTDOJO_PRODUCT") or repo
+    ptype = os.environ.get("SEC_DEFECTDOJO_PRODUCT_TYPE") or "Warden"
+    if a.dry_run:
+        for k, f in files:
+            print(f"defectdojo (dry run): would reimport the Wiz {k} scan ({WIZ_SCAN_TYPES[k]}) into product '{product}', engagement '{branch}' at {url or '<SEC_DEFECTDOJO_URL>'}")
+        return True
+    if not token:
+        return err(a, "defectdojo: DEFECTDOJO_TOKEN is not set (add it as a CI secret); not sending the Wiz results")
+    http_note(url)
+    ok = True
+    for k, f in files:
+        fields = {"scan_type": WIZ_SCAN_TYPES[k], "product_name": product, "product_type_name": ptype, "engagement_name": branch, "test_title": f"Wiz CLI {k} scan",
+                  "auto_create_context": "true", "close_old_findings": "true", "close_old_findings_product_scope": "false", "minimum_severity": "Info", "active": "true",
+                  "verified": "false", "branch_tag": branch, "commit_hash": commit[:100], "environment": "Development", "tags": "warden,wiz"}
+        body, ctype = multipart(fields, {"file": (os.path.basename(f), open(f, "rb").read(), "application/json")})
+        st, res = request("POST", url + "/api/v2/reimport-scan/", {"Authorization": f"Token {token}", "Content-Type": ctype}, body, timeout=180)
+        if st in (200, 201):
+            stats = res.get("statistics") if isinstance(res, dict) and isinstance(res.get("statistics"), dict) else {}
+            after = ((stats.get("after") or {}).get("total") or {}).get("active", "?")
+            print(f"defectdojo: Wiz {k} scan imported for {product} ({branch}) [{st}]  open now {after}")
+        else:
+            why = {401: "token rejected", 403: "the token's user may not import here", 0: f"could not reach {url}: {res}"}.get(st, f"server answered {st}: {str(res)[:200]}")
+            ok = err(a, f"defectdojo: Wiz {k} scan: {why}") and ok
+    return ok
+
+
 # ------------------------------------------------------------------ Dependency-Track
 def publish_dtrack(a, ctx):
     url, key = os.environ.get("SEC_DTRACK_URL", "").rstrip("/"), os.environ.get("DTRACK_API_KEY", "")
@@ -200,7 +244,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--report", required=True)
     ap.add_argument("--root", default=".")
-    ap.add_argument("--only", default="", help="dojo, dtrack or both (default: whichever has its URL set)")
+    ap.add_argument("--only", default="", help="dojo, dtrack, wiz (comma list; default: dojo and dtrack, whichever has its URL set). wiz = import the Wiz CLI results in --report into DefectDojo")
     ap.add_argument("--strict", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="show what would be sent; contact nobody")
     a = ap.parse_args()
@@ -223,6 +267,8 @@ def main():
         ok = publish_dojo(a, ctx) and ok
     if "dtrack" in want:
         ok = publish_dtrack(a, ctx) and ok
+    if "wiz" in want:
+        ok = publish_wiz(a, ctx) and ok
     return 0 if ok or not a.strict else 1
 
 

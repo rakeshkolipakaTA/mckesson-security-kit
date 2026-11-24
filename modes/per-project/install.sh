@@ -73,13 +73,14 @@ INSTALLED=""
 if want github; then
   put github-actions-release.yml security-release.github.yml; put github-actions-dast.yml security-dast.github.yml
   put github-actions-pr.yml security-scan.github.yml; put github-actions-codeql.yml security-codeql.github.yml
+  put github-actions-wiz.yml security-wiz.github.yml        # optional, needs a Wiz licence
   if [ ! -f "$REPO/.github/workflows/security-scan.yml" ]; then
     mkdir -p "$REPO/.github/workflows"; cp "$T/github-actions-pr.yml" "$REPO/.github/workflows/security-scan.yml"
     INSTALLED=".github/workflows/security-scan.yml"
   fi
 fi
 want jenkins && { put Jenkinsfile.security Jenkinsfile.security; put securityScan.groovy securityScan.groovy; }
-want azure   && put azure-pipelines-security.yml azure-pipelines-security.yml
+want azure   && { put azure-pipelines-security.yml azure-pipelines-security.yml; put azure-pipelines-wiz.yml azure-pipelines-wiz.yml; }
 want github  && { put github-actions-redteam.yml security-redteam.github.yml
                  put github-actions-sign-release.yml security-sign-release.github.yml; put github-actions-scorecard.yml security-scorecard.github.yml; }
 put renovate.json renovate.json
