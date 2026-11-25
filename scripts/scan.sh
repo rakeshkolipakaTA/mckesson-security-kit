@@ -45,7 +45,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/versions.env"
 
-REPO="" OUT="" SEC_DIR_ARG="" BASELINE="" WRITE_BASELINE=0 PRINT_PROFILES=0 EXPLAIN=0 PARTIAL=0 PUBLISH_LATEST=0 PUBLISH_DRY= WIZ_MODE=0
+REPO="" OUT="" SEC_DIR_ARG="" BASELINE="" WRITE_BASELINE=0 PRINT_PROFILES=0 PRINT_SEMGREP_PACKS=0 EXPLAIN=0 PARTIAL=0 PUBLISH_LATEST=0 PUBLISH_DRY= WIZ_MODE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --profile) SEC_PROFILE="$2"; shift 2;; --gate) SEC_GATE="$2"; shift 2;; --enforce) SEC_ENFORCE=1; shift;;
@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
     --baseline) BASELINE="$2"; shift 2;; --write-baseline) WRITE_BASELINE=1; shift;;
     --redteam-url) SEC_REDTEAM_URL="$2"; shift 2;; --redteam-network) SEC_REDTEAM_NETWORK="$2"; shift 2;; --redteam-contract) SEC_REDTEAM_CONTRACT="$2"; shift 2;;
     --preset) SEC_PRESET="$2"; shift 2;; --partial) PARTIAL=1; shift;; --explain) EXPLAIN=1; shift;; --publish-latest) PUBLISH_LATEST=1; shift;; --dry-run) PUBLISH_DRY=--dry-run; shift;; --wiz) WIZ_MODE=1; shift;; --exclude) SEC_EXCLUDE_PATHS="$2"; shift 2;;
-    --print-profiles) PRINT_PROFILES=1; shift;; --sec-dir) SEC_DIR_ARG="$2"; shift 2;; --out) OUT="$2"; shift 2;;
+    --print-profiles) PRINT_PROFILES=1; shift;; --print-semgrep-packs) PRINT_SEMGREP_PACKS=1; shift;; --sec-dir) SEC_DIR_ARG="$2"; shift 2;; --out) OUT="$2"; shift 2;;
     -h|--help) sed -n '2,44p' "$0"; exit 0;;
     -*) echo "unknown option $1 (see --help)" >&2; exit 2;; *) REPO="$1"; shift;;
   esac
@@ -204,6 +204,28 @@ else
 fi
 is() { [[ " ${PROFILES[*]} " == *" $1 "* ]]; }
 [ "$PRINT_PROFILES" = 1 ] && { echo "${PROFILES[*]}"; exit 0; }
+# Registry rule packs this repo's Semgrep scan uses, one per line as "base <pack>" or "extra <pack>" (used by the scan and by `warden rules fetch`)
+semgrep_packs() {
+  local packs=() pk
+  echo "base p/default"; echo "base p/owasp-top-ten"
+  is python && echo "base p/python"
+  is node   && { echo "base p/javascript"; echo "base p/typescript"; echo "base p/nodejs"; }
+  is java   && echo "base p/java"
+  # Extra SAST rule packs (injection, XSS, JWT, insecure transport, CWE Top 25, framework packs). SEC_SEMGREP_PACKS: auto (default) | none | p/a,p/b (replaces the list)
+  case "$SEC_SEMGREP_PACKS" in
+    none) ;;
+    auto) packs=(p/security-audit p/cwe-top-25 p/sql-injection p/command-injection p/insecure-transport p/jwt)
+          is python && packs+=(p/flask p/django p/fastapi)
+          is node   && packs+=(p/xss p/expressjs p/react)
+          [ -n "$(find "$REPO" -maxdepth 4 -iname 'Dockerfile*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ] && packs+=(p/dockerfile);;
+    *)    IFS=, read -r -a packs <<<"$SEC_SEMGREP_PACKS";;
+  esac
+  for pk in "${packs[@]}"; do
+    [[ "$pk" =~ ^[pr]/[A-Za-z0-9._-]+$ ]] || { echo "NOTE: ignored invalid Semgrep pack '$pk' in SEC_SEMGREP_PACKS (expected p/name)" >&2; continue; }
+    echo "extra $pk"
+  done
+}
+[ "$PRINT_SEMGREP_PACKS" = 1 ] && { semgrep_packs | awk '{print $2}'; exit 0; }
 model_files_present() { has_files -name '*.pkl' -o -name '*.pickle' -o -name '*.pt' -o -name '*.pth' -o -name '*.bin' -o -name '*.ckpt' -o -name '*.h5' -o -name '*.joblib' -o -name '*.npy' -o -name '*.keras'; }
 
 # ---- which tools run: preset + SEC_<TOOL> switches + central required-tools lock + waivers (scripts/toolplan.py) ----
@@ -368,26 +390,17 @@ run_trivy_image() {
 }
 run_semgrep() {
   log "semgrep: code analysis (${PROFILES[*]})"
-  local cfgs=(--config p/default --config p/owasp-top-ten) ex=() p
-  if [ -n "$SEC_SEMGREP_RULES" ]; then cfgs=(--config /rules)   # offline / approved rule set
+  local cfgs=() ex=() p rules="$SEC_SEMGREP_RULES"
+  if [ -n "$rules" ]; then   # offline / approved rule set (a folder of Semgrep YAML files; a relative path is relative to the repo)
+    case "$rules" in /*) ;; *) rules="$REPO/$rules";; esac
+    if [ ! -d "$rules" ] || [ -z "$(find "$rules" -maxdepth 2 \( -name '*.yml' -o -name '*.yaml' \) -print -quit 2>/dev/null)" ]; then
+      echo "ERROR: SEC_SEMGREP_RULES=$SEC_SEMGREP_RULES has no Semgrep rule files (*.yml). Create them once on a machine that can reach semgrep.dev: warden rules fetch" >&2
+      return
+    fi
+    cfgs=(--config /rules); log "semgrep rules: offline folder $SEC_SEMGREP_RULES (nothing is downloaded)"
   else
-    is python && cfgs+=(--config p/python)
-    is node   && cfgs+=(--config p/javascript --config p/typescript --config p/nodejs)
-    is java   && cfgs+=(--config p/java)
-    # Extra SAST rule packs (injection, XSS, JWT, insecure transport, CWE Top 25, framework packs). SEC_SEMGREP_PACKS: auto (default) | none | p/a,p/b (replaces the list)
-    local packs=()
-    case "$SEC_SEMGREP_PACKS" in
-      none) ;;
-      auto) packs=(p/security-audit p/cwe-top-25 p/sql-injection p/command-injection p/insecure-transport p/jwt)
-            is python && packs+=(p/flask p/django p/fastapi)
-            is node   && packs+=(p/xss p/expressjs p/react)
-            [ -n "$(find "$REPO" -maxdepth 4 -iname 'Dockerfile*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ] && packs+=(p/dockerfile);;
-      *)    IFS=, read -r -a packs <<<"$SEC_SEMGREP_PACKS";;
-    esac
-    local pk used_packs=(); for pk in "${packs[@]}"; do
-      [[ "$pk" =~ ^[pr]/[A-Za-z0-9._-]+$ ]] || { echo "NOTE: ignored invalid Semgrep pack '$pk' in SEC_SEMGREP_PACKS (expected p/name)" >&2; continue; }
-      cfgs+=(--config "$pk"); used_packs+=("$pk")
-    done
+    local kind pk used_packs=()
+    while read -r kind pk; do cfgs+=(--config "$pk"); [ "$kind" = extra ] && used_packs+=("$pk"); done < <(semgrep_packs)
     log "semgrep extra packs: ${used_packs[*]:-none}"
   fi
   local rmount=()
@@ -395,9 +408,10 @@ run_semgrep() {
   for p in .security node_modules .venv venv build dist tests test '*.egg-info' '*.min.js' '*.yaml.test'; do ex+=(--exclude "$p"); done
   # rules that are noise for everyone (e.g. "python 3.7 compatibility"); one rule id per line in configs/semgrep/exclude-rules.txt
   while IFS= read -r p; do p="${p%%#*}"; p="${p//[[:space:]]/}"; [ -n "$p" ] && ex+=(--exclude-rule "$p"); done < "$HERE/configs/semgrep/exclude-rules.txt"
-  local mounts=("${rmount[@]}"); [ -n "$SEC_SEMGREP_RULES" ] && mounts+=(-v "$SEC_SEMGREP_RULES:/rules:ro")
+  local mounts=("${rmount[@]}"); [ -n "$SEC_SEMGREP_RULES" ] && mounts+=(-v "$rules:/rules:ro")
   docker run --rm --user "$UIDGID" -e HOME=/tmp -v "$REPO:/src:ro" -v "$OUT/raw:/out" "${mounts[@]}" "$SEMGREP_IMAGE" \
     semgrep scan --metrics=off --disable-version-check --quiet --json --output /out/semgrep.json "${cfgs[@]}" "${ex[@]}" /src 2>&1 | tail -3
+  [ -s "$OUT/raw/semgrep.json" ] || echo "ERROR: Semgrep produced no result. If semgrep.dev is blocked on this network, run 'warden rules fetch' once on a machine that can reach it, commit .security/semgrep-rules and set SEC_SEMGREP_RULES=.security/semgrep-rules" >&2
   TOOLS+=(semgrep)
 }
 run_bandit() {

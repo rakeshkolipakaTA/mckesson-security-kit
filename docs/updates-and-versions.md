@@ -1,5 +1,7 @@
 # How new checks reach your repos (updates and versions)
 
+> **This page is about `--thin` repos** (`warden init --thin`), which fetch the engine from our repository. The default `warden init` is **vendored**: the engine is copied into the repo (`.security/kit`) and changes only when someone re-runs `warden init` from a newer Warden and merges the diff. Pick vendored when GitHub Actions may not pull from our repository.
+
 You do not have to touch each repository when Warden gets a new check, a new rule pack or a fix.
 
 ## The default: repos follow the newest release automatically
@@ -24,7 +26,7 @@ warden upgrade --pin # refresh generated files and keep an exact version
 A pinned repo changes only when someone moves the pin in a pull request. Regulated or release-critical repos should pin; fast-moving repos can follow.
 
 ## Offline or blocked network
-With `channel=auto` the launcher falls back to the newest copy already in the cache and says so. If nothing is cached it stops and tells you to connect once or pin. A vendored install (`warden init --vendor`) never needs the network for the engine.
+With `channel=auto` the launcher falls back to the newest copy already in the cache and says so. If nothing is cached it stops and tells you to connect once or pin. A vendored repo (the default) never needs the network for the engine. Scanner images, Semgrep rules and vulnerability databases are separate: [offline-and-blocked-networks.md](offline-and-blocked-networks.md).
 
 ## Releasing (for the Warden maintainers)
 1. Change code, bump `VERSION` (for example `1.1.0`), run the tests (`make test`), commit.

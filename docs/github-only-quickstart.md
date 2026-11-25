@@ -8,6 +8,8 @@ The results are shown **in GitHub itself**. A dashboard is optional and can be a
 warden init                  # detects your stack, adds .security/ and .github/workflows/security-scan.yml
 git add .security .github && git commit -m "Add Warden security scanning (report-only)" && git push
 ```
+`init` copies the whole engine into `.security/kit`, so the workflow pulls nothing from our repository or package index ([details](per-project-mode.md#self-contained-repo-the-default-no-access-to-our-repository-needed)). Use `warden init --thin` only if you want to follow our releases automatically.
+
 Open a pull request. That is all. It starts **report-only**: nothing can block a merge until your team chooses (`warden config set SEC_PRESET standard`).
 
 ## Where you see the results (all inside GitHub)
@@ -61,7 +63,7 @@ When a team has a Warden dashboard server ([dashboard.md](dashboard.md)), add tw
 Every scan is then also sent to the dashboard (portfolio view, trends, overdue findings). If the dashboard is down, the build is not affected. GitHub-hosted runners can only reach a dashboard that is reachable from the internet (or use a self-hosted runner inside your network).
 
 ## Updates: new checks reach the repo by themselves
-By default the repo follows the newest Warden release (`channel=auto`), so a new check or rule pack added centrally runs on the **next** workflow run with nothing to change in the repo. Teams that want reviewed upgrades run `warden pin`. Details and the security trade-off: [updates-and-versions.md](updates-and-versions.md).
+In a `--thin` repo (`warden init --thin`) the repo follows the newest Warden release (`channel=auto`), so a new check or rule pack added centrally runs on the **next** workflow run with nothing to change in the repo. Teams that want reviewed upgrades run `warden pin`. Details and the security trade-off: [updates-and-versions.md](updates-and-versions.md).
 
 ## Honest limits of GitHub-only
 - **No history or trends** across repositories; each run stands alone (the dashboard adds this).

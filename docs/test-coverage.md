@@ -1,6 +1,6 @@
 # What we test: coverage by category
 
-Generated from `tools/coverage_data.py` on 2026-11-24. The same data is in [security-test-coverage.xlsx](security-test-coverage.xlsx) (filterable, with roadmap and glossary).
+Generated from `tools/coverage_data.py` on 2026-11-25. The same data is in [security-test-coverage.xlsx](security-test-coverage.xlsx) (filterable, with roadmap and glossary).
 
 ## 1. Categories and how many checks each has
 
@@ -22,6 +22,20 @@ Generated from `tools/coverage_data.py` on 2026-11-24. The same data is in [secu
 | **Total** |  | **129** | 21 scanner tools plus the library, gate and process kit |
 
 A *check* is one rule, probe or control we can name. Scanner tools such as Semgrep contain thousands of rules; they are counted once. Categories 1-8 find problems (scanners, probes, template/doc checks); the rest are controls you embed, decision logic and process.
+
+### Where the checks run, and what needs a server
+
+**97 of 129 checks (75%) run in GitHub Actions with no server of ours**; 69 of them (53%) need only the repository. Counting only checks that scan something (105), that is 97 of 105 (92%), and 8 (8%) need a server or licence. The servers add views and registers; every scanner itself runs in the pipeline.
+
+| Where it runs | Checks | Share | What is in it |
+|---|---|---|---|
+| In GitHub Actions, on the code only | 69 | 53% | Needs nothing but the repository |
+| In GitHub Actions, against a running test app | 28 | 22% | ZAP, API fuzzing and AI-agent red-team probes: need a deployed QA app, no server of ours |
+| Needs a server or a licence | 8 | 6% | SonarQube, DefectDojo, Dependency-Track, Wiz, Warden dashboard (with its SLA tracking and alert webhooks) |
+| Not a pipeline scan | 24 | 19% | Runtime library modules, live cluster and cloud account checks, Falco, SIEM, process kit, developer-machine items |
+| **Total** | **129** | 100% |  |
+
+Rows are not equal in weight (the 29 AI-agent rules are one row each), so treat the percentages as a guide.
 
 ## 2. Status of every check
 
@@ -110,9 +124,9 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | Suite | What it proves | Checks |
 |---|---|---|
 | scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing, Wiz CLI runner | 26 |
-| scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers | 83 |
-| scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script and roll | 89 |
-| scripts/test-newtools.sh | SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs | 46 |
+| scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers; self-contained vendored kit | 87 |
+| scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode (the default), thin mode, ci-report, auto-update channel, pin, release script and roll | 91 |
+| scripts/test-newtools.sh | SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs; offline Semgrep rules | 51 |
 | scripts/e2e-agent.sh | Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain | 12 |
 | scripts/test_gate.py | Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit) | 28 |
 | scripts/test_toolplan.py | Presets, per-tool switches, required-tool lock, waivers, opt-in git history (unit) | 17 |
@@ -123,10 +137,11 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | scripts/test_creds.py | Local credential store: names only in lists, mode 600, profiles, refuses git working trees | 4 |
 | scripts/test_gh_report.py | GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API) | 17 |
 | scripts/test_publish_external.py | DefectDojo reimport, Dependency-Track SBOM upload and Wiz result import against mock servers: field mapping, branch filter, failures are warnings, no secret echo, dry run (unit) | 18 |
+| scripts/test_semgrep_rules.py | Semgrep rule downloader against a local server: good pack saved and counted, README with licence note, bad answer / missing pack / unreachable server fail, names validated before any download | 7 |
 | scripts/test_wiz_scan.py | Wiz CLI runner with a stand-in wizcli: no licence runs nothing, commands, secrets never printed, policy failure vs error, enforcement, hash-checked install, warden wiz via scan.sh (unit) | 14 |
 | scripts/test_tools.py | Exposure, repo-posture and API-fuzz helpers (unit) | 7 |
 | agentic/tests/test_agentsec.py | Runtime-controls library (unit) | 24 |
 | agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
 | agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
 | agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
-| **Total** |  | **523** |
+| **Total** |  | **541** |

@@ -11,14 +11,15 @@ has() { if grep -qE -- "$2" "$3" 2>/dev/null; then check "$1" 1 1; else check "$
 no() { if grep -qE -- "$2" "$3" 2>/dev/null; then check "$1" 0 1; else check "$1" 0 0; fi; }
 
 echo "== install into a clean virtualenv"
-python3 -m venv "$T/venv" && "$T/venv/bin/pip" install -q "$HERE" >"$T/pip.log" 2>&1; check "pip install of the package" 0 $?
+rm -rf "$HERE/build"   # a stale build/ folder would package an old copy of the kit
+python3 -m venv "$T/venv" &&"$T/venv/bin/pip" install -q "$HERE" >"$T/pip.log" 2>&1; check "pip install of the package" 0 $?
 V="$T/venv/bin/warden"; VER="$(head -1 VERSION)"
 "$V" --version 2>&1 | head -1 | grep -q "warden $VER"; check "warden --version prints the packaged version" 0 $?
 [ -f "$T/venv/lib/python3."*/site-packages/warden_kit/kit/scripts/scan.sh ]; check "engine is bundled in the package" 0 $?
 
 r="$T/repo"; cp -a examples/clean-python "$r"; rm -rf "$r/.security"; git -C "$r" init -q
-echo "== init (thin mode: nothing of the engine is copied into the repo)"
-( cd "$r" && "$V" init >"$T/init.log" 2>&1 ); check "warden init" 0 $?
+echo "== init --thin (nothing of the engine is copied into the repo)"
+( cd "$r" && "$V" init --thin >"$T/init.log" 2>&1 ); check "warden init" 0 $?
 [ -d "$r/.security/kit" ]; check "no engine copied into the repo" 1 $?
 has "lock pins the version" "^version=$VER" "$r/.security/warden.lock"
 has "lock records mode=thin" "^mode=thin" "$r/.security/warden.lock"
@@ -78,11 +79,14 @@ warden uninstall --yes >/dev/null 2>&1; check "uninstall --yes" 0 $?
 [ -f .security/config.env ] && [ -f .security/exceptions.json ]; check "config + exceptions kept" 0 $?
 warden reinstall >/dev/null 2>&1; check "reinstall" 0 $?
 [ -x .security/warden ] && [ -f .security/warden.lock ] && grep -q '^SEC_PRESET=standard' .security/config.env; check "reinstall restores files and keeps my config" 0 $?
+warden init --thin >/dev/null 2>&1; warden reinstall >/dev/null 2>&1; grep -q '^mode=thin' .security/warden.lock; check "reinstall keeps a thin repo thin" 0 $?
 echo "# my own workflow" > .github/workflows/security-scan.yml
 warden uninstall --yes >/dev/null 2>&1; [ -f .github/workflows/security-scan.yml ]; check "a workflow you changed is never deleted" 0 $?
 warden uninstall --yes --purge >/dev/null 2>&1; [ ! -d .security ]; check "--purge removes .security completely" 0 $?
 
-echo "== vendored mode (offline / air-gapped)"
+echo "== vendored mode (the default; nothing is pulled from our repo)"
+warden init >/dev/null 2>&1; [ -d .security/kit/scripts ] && grep -q '^mode=vendored' .security/warden.lock; check "plain init is vendored by default" 0 $?
+warden uninstall --yes --purge >/dev/null 2>&1
 warden init --vendor >/dev/null 2>&1; check "init --vendor" 0 $?
 [ -d .security/kit/scripts ] && grep -q '^mode=vendored' .security/warden.lock; check "engine copied into .security/kit" 0 $?
 o="$(.security/warden config show 2>&1)"; grep -q 'preset=' <<< "$o"; check "vendored kit runs without warden on the PATH" 0 $?

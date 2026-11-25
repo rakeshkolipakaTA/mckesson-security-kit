@@ -23,7 +23,7 @@ The result is one HTML report, a summary on the pipeline page, markers on the ri
 ## Before you start
 - **Docker** installed and running (Docker Desktop on Windows/Mac, Docker Engine on Linux). On Windows use WSL2 or Git Bash.
 - **Python 3.8+** and **Git**. That is all.
-- **Who installs what.** The **team lead** installs `warden` once and adds it to the repo. **Everyone else just runs `git pull`**: the repo carries a small launcher (`.security/warden`) that installs the exact pinned version by itself the first time it runs, and CI does the same.
+- **Who installs what.** The **team lead** installs `warden` once and runs `warden init`, which puts the engine in the repo. **Everyone else just runs `git pull`**: nothing else to install, and CI uses the same files.
 
 ## Step 1: install Warden once, then add it to your repo
 **Linux / macOS**
@@ -46,8 +46,8 @@ cd your-repo
 warden init                      # add --preset standard to block PRs from day one
 git add .security .github && git commit -m "Add security scanning (report-only)" && git push
 ```
-`init` detects your stack, adds `.security/` (config, CI templates, a version pin), and for GitHub adds `.github/workflows/security-scan.yml`.
-By default the repo then **follows the newest Warden release automatically** (new checks arrive with no change in your repo; `warden pin` freezes a version): [updates-and-versions.md](updates-and-versions.md). It never overwrites your own files, and re-running it (or `warden upgrade`) refreshes the generated ones. No engine files are copied into your repo; only the pin (`warden.lock`). For offline / air-gapped use `warden init --vendor` copies the engine into `.security/kit`.
+`init` detects your stack, adds `.security/` (config, CI templates and **the whole engine in `.security/kit`**), and for GitHub adds `.github/workflows/security-scan.yml`. The repo is **self-contained**: GitHub Actions and teammates need no access to our repository or package index, only Docker. It never overwrites your own files; re-running it from a newer Warden refreshes the generated ones and shows up as a normal diff to review ([per-project-mode.md](per-project-mode.md#self-contained-repo-the-default-no-access-to-our-repository-needed)).
+Prefer to follow our releases automatically instead (a small `warden.lock` pin, the engine fetched from our repository on each run)? Use `warden init --thin`: [updates-and-versions.md](updates-and-versions.md).
 
 ## Step 2: check your machine
 ```bash

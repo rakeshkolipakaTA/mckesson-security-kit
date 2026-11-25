@@ -1,9 +1,9 @@
-# Warden: Security Scanning Framework (v1)
+# Warden: One Module for Complete DevSecOps Security
 
 Reference implementation of a central DevSecOps scanning plan: one framework, tools for every layer, templates for GitHub Actions / Jenkins / Azure DevOps,
 and guides written so that **a developer with no DevOps help can onboard a repo in about 10 minutes**.
 
-**Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**. Version 1 runs entirely in GitHub Actions and shows results in GitHub (pull request comment, file markers, run summary, report artifact): [docs/github-only-quickstart.md](docs/github-only-quickstart.md). The dashboard is optional and can be added later. Release notes: [CHANGELOG.md](CHANGELOG.md).
+**Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)** (or the one-page [developer guide](docs/warden-developer-guide.md)). Version 1 runs entirely in GitHub Actions and shows results in GitHub (pull request comment, file markers, run summary, report artifact): [docs/github-only-quickstart.md](docs/github-only-quickstart.md). **`warden init` copies the whole engine into the repo (`.security/kit`), so GitHub Actions needs no access to our repository: [docs/per-project-mode.md](docs/per-project-mode.md#self-contained-repo-the-default-no-access-to-our-repository-needed). Networks that block semgrep.dev: [docs/offline-and-blocked-networks.md](docs/offline-and-blocked-networks.md).** The dashboard is optional and can be added later. Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
 pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.2"   # once, in a venv (team lead)
@@ -14,7 +14,7 @@ warden init                                 # add scanning (+ GitHub workflow); 
 .security/warden config show                # what runs and why; settings live in .security/config.env
 .security/warden open                       # HTML report
 ```
-Teammates and CI install nothing: the repo pins the version and the launcher fetches it. Settings: [docs/configuration.md](docs/configuration.md).
+Teammates and CI install nothing: `warden init` copies the whole engine into the repo (`.security/kit`), so the workflow pulls nothing from us. To follow our releases from our repository instead, use `warden init --thin`. Settings: [docs/configuration.md](docs/configuration.md).
 
 ## Tools (all pinned, run in Docker, repo mounted read-only)
 _AI agents:_ see [docs/agentic-security.md](docs/agentic-security.md): agent-specific Semgrep rules, inventory/registry scan, model-file scan, deterministic red-team probes, and the `agentsec` runtime-controls library.
@@ -52,6 +52,16 @@ Full detail, filterable: **[docs/security-test-coverage.xlsx](docs/security-test
 | Process & governance | Do people have the procedures that tools cannot provide? | 1 | 9 process documents |
 | **Total** |  | **129** | 21 scanner tools plus the library and gate |
 
+**Where the checks run, and what needs a server.** **97 of 129 checks (75%) run in GitHub Actions with no server of ours**; 69 of them (53%) need only the repository. Counting only checks that scan something (105), that is 97 of 105 (92%), and 8 (8%) need a server or licence. The servers add views and registers; every scanner itself runs in the pipeline.
+
+| Where it runs | Checks | Share | What is in it |
+|---|---|---|---|
+| In GitHub Actions, on the code only | 69 | 53% | Needs nothing but the repository |
+| In GitHub Actions, against a running test app | 28 | 22% | ZAP, API fuzzing and AI-agent red-team probes: need a deployed QA app, no server of ours |
+| Needs a server or a licence | 8 | 6% | SonarQube, DefectDojo, Dependency-Track, Wiz, Warden dashboard (with its SLA tracking and alert webhooks) |
+| Not a pipeline scan | 24 | 19% | Runtime library modules, live cluster and cloud account checks, Falco, SIEM, process kit, developer-machine items |
+| **Total** | **129** | 100% |  |
+
 **Coverage of the Agentic Security presentation:** 97 items checked: 47 covered, 47 partial, 3 not covered. Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). Roadmap: 16 done, 6 partly, 1 documented only, 7 planned (penetration-test gaps).
 <!-- coverage:end -->
 
@@ -79,7 +89,7 @@ scripts/platform-up.sh --defectdojo --dtrack       # platform team: start them (
 | **Team leads** | [configuration (presets, tool switches)](docs/configuration.md) · [integrations: SonarQube, DefectDojo, Dependency-Track](docs/integrations/README.md) · [setup & integration (URLs, tokens, CI)](docs/integrations.md) · [dashboard](docs/dashboard.md) · [onboarding checklist](docs/onboarding-checklist.md) · [policy](docs/policy.md) |
 | **Platform / security team** | [integrations](docs/integrations/README.md) · [setup & integration](docs/integrations.md) · [dashboard](docs/dashboard.md) · [platform setup](docs/platform-setup.md) · [central mode](docs/central-mode.md) · [per-project mode](docs/per-project-mode.md) · [tools](docs/tools.md) · [SonarQube](docs/sonar-setup.md) |
 | **AI agents** | [agentic security overview + coverage map](docs/agentic-security.md) · [red teaming](docs/agentic-redteam.md) · [agentsec runtime library](docs/agentic-runtime-library.md) |
-| **Evidence** | [point-of-view deck (HTML, cyber security and VAPT)](docs/warden-pov-presentation.html) · [logged-in scans, SSO and test credentials](docs/zap-authentication.md) · [what we test, by category](docs/test-coverage.md) · [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
+| **Evidence** | [point-of-view deck (HTML, cyber security and VAPT)](docs/warden-pov-presentation.html) · [point-of-view deck, written as a plan: integrations, pillars, domains, threats, controls, scanning, adoption (HTML, generated by `tools/build_pov.py`)](docs/warden-pov-full.html) · [logged-in scans, SSO and test credentials](docs/zap-authentication.md) · [what we test, by category](docs/test-coverage.md) · [what is verified / not](docs/status.md) · [end-to-end test on a vulnerable app](docs/fastapi-e2e.md) |
 
 ## Repository layout
 ```

@@ -16,8 +16,9 @@
 #   warden redteam --redteam-url URL   (agents) run the AI red-team probes against a RUNNING QA agent you own; needs REDTEAM_TOKEN for authenticated agents
 #   warden agentlib [dir]    (agents) copy the agentsec runtime-controls library (guardrails, policy, audit, ...) into your repo
 #   warden hook install|remove   run `warden quick` automatically before every `git push`
-#   warden init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor]   add security scanning to a repo (default: current folder)
+#   warden init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--thin]   add security scanning to a repo (default: current folder; the whole engine is copied into .security/kit, --thin pulls it from the Warden repo instead)
 #   warden creds set|list|delete NAME   keep test credentials (ZAP logins, tokens) on THIS machine, outside the repo; typed hidden; CI uses CI secrets (docs/zap-authentication.md)
+#   warden rules fetch [dir]  download the Semgrep rule packs this repo uses (default dir .security/semgrep-rules) so scans work where semgrep.dev is blocked; then set SEC_SEMGREP_RULES (docs/offline-and-blocked-networks.md)
 #   warden pin [--auto]      fix this repo to the warden version running now (reviewed upgrades), or --auto to follow the newest release again
 #   warden upgrade           refresh the generated files to the installed warden version (keeps your config, exceptions, baseline)
 #   warden disable --until YYYY-MM-DD --reason "text"   switch scanning off for a limited time (max 90 days); it resumes by itself
@@ -49,7 +50,7 @@ cmd_doctor() {
   local host code
   for host in "ghcr.io" "registry-1.docker.io" "pypi.org" "registry.npmjs.org" "semgrep.dev" "mirror.gcr.io"; do
     code=$(curl -s -o /dev/null -m 6 -w '%{http_code}' "https://$host/" 2>/dev/null || true)
-    [ "${code:-000}" != 000 ] && ok "$host reachable" || warn "$host NOT reachable (needed for: $(case $host in ghcr.io|mirror.gcr.io) echo 'Trivy database, gitleaks image';; registry-1.docker.io) echo 'scanner images';; pypi.org) echo 'pip-audit';; registry.npmjs.org) echo 'npm audit';; semgrep.dev) echo 'Semgrep rules (or set SEC_SEMGREP_RULES)';; esac))"
+    [ "${code:-000}" != 000 ] && ok "$host reachable" || warn "$host NOT reachable (needed for: $(case $host in ghcr.io|mirror.gcr.io) echo 'Trivy database, gitleaks image';; registry-1.docker.io) echo 'scanner images';; pypi.org) echo 'pip-audit';; registry.npmjs.org) echo 'npm audit';; semgrep.dev) echo 'Semgrep rules; offline: warden rules fetch, then SEC_SEMGREP_RULES';; esac))"
   done
   echo "  scanner images:"
   local img
@@ -143,6 +144,11 @@ case "$c" in
   tickets)  rep="$(sec_dir)/reports/latest"; [ -d "$rep" ] || rep=reports/latest
             exec python3 -I "$ROOT/scripts/tickets.py" --report "$rep" "$@";;
   creds)    exec python3 -I "$ROOT/scripts/creds.py" "$@";;
+  rules)    [ "${1:-}" = fetch ] || { echo "usage: warden rules fetch [dir]   (downloads the Semgrep rule packs this repo uses)"; exit 2; }
+            shift; dir="${1:-$(sec_dir)/semgrep-rules}"
+            packs="$("$SCAN" $(target_args) --print-semgrep-packs)" || exit 1
+            # shellcheck disable=SC2086
+            exec python3 -I "$ROOT/scripts/semgrep_rules.py" --out "$dir" $packs;;
   pin)      [ "$IN_KIT" = 1 ] && { echo "this repo vendors its engine; nothing to pin"; exit 2; }
             lk="$(sec_dir)/warden.lock"; [ -f "$lk" ] || { echo "no $lk: run warden init first"; exit 1; }
             v="${WARDEN_VERSION:-$(head -1 "$ROOT/VERSION" 2>/dev/null)}"; src="$(lock_get source)"; base="${src%@*}"
@@ -160,7 +166,8 @@ case "$c" in
   upgrade)  [ "$IN_KIT" = 1 ] && { echo "this repo vendors its engine: upgrade it from the framework checkout with 'scripts/warden init <repo>'"; exit 2; }
             exec "$ROOT/modes/per-project/install.sh" . "$@";;
   reinstall) [ "$IN_KIT" = 1 ] && { echo "run reinstall from the framework checkout or with the installed warden (not from a vendored kit)"; exit 2; }
-            cmd_uninstall --yes >/dev/null && exec "$ROOT/modes/per-project/install.sh" . "$@";;
+            keep=""; [ "$(lock_get mode)" = thin ] && keep="--thin"
+            cmd_uninstall --yes >/dev/null && exec "$ROOT/modes/per-project/install.sh" . $keep "$@";;
   --version|-V|version) echo "warden ${WARDEN_VERSION:-$(cat "$ROOT/VERSION" 2>/dev/null | head -1)}"; l="$(lock_get version)"; ch="$(lock_get channel)"; [ "$ch" = auto ] && echo "this repo follows the newest release of $(lock_get source | sed 's/.*@//') automatically" || { [ -z "$l" ] || echo "this repo is pinned to $l"; };;
   hook)     cmd_hook "$@";;
   wiz)      WARDEN_WIZ_ARGS="$*" exec "$SCAN" $(target_args) --wiz;;

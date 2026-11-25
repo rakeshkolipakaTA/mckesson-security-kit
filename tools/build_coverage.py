@@ -42,6 +42,27 @@ def md_table(head, rows):
     return "\n".join(["| " + " | ".join(head) + " |", "|" + "---|" * len(head)] + ["| " + " | ".join(esc(c) for c in r) + " |" for r in rows])
 
 
+def where_rows():
+    """Counts per place a check runs, as table rows, plus the headline numbers."""
+    n = len(D.INVENTORY)
+    cnt = Counter(D.where_runs(r) for r in D.INVENTORY)
+    assert sum(cnt.values()) == n
+    rows = [(D.WHERE_LABEL[k][0], cnt[k], f"{round(cnt[k] * 100 / n)}%", D.WHERE_LABEL[k][1]) for k in D.WHERE_ORDER]
+    no_server = cnt["actions"] + cnt["qa"]
+    scans = n - cnt["other"]
+    return rows, cnt, no_server, scans
+
+
+def where_text():
+    rows, cnt, no_server, scans = where_rows()
+    n = len(D.INVENTORY)
+    return (f"**{no_server} of {n} checks ({round(no_server * 100 / n)}%) run in GitHub Actions with no server of ours**; "
+            f"{cnt['actions']} of them ({round(cnt['actions'] * 100 / n)}%) need only the repository. "
+            f"Counting only checks that scan something ({scans}), that is {no_server} of {scans} ({round(no_server * 100 / scans)}%), "
+            f"and {cnt['server']} ({round(cnt['server'] * 100 / scans)}%) need a server or licence. "
+            "The servers add views and registers; every scanner itself runs in the pipeline.")
+
+
 def write_md():
     today = dt.date.today().isoformat()
     L = ["# What we test: coverage by category", "",
@@ -50,6 +71,10 @@ def write_md():
          md_table(["Category", "Question it answers", "Checks", "Tools"], [(c, D.CATEGORY_NOTES[c], len(v), TOOLS[c]) for c, v in cats.items()] + [("**Total**", "", f"**{len(D.INVENTORY)}**", f"{N_TOOLS} scanner tools plus the library, gate and process kit")]), "",
          "A *check* is one rule, probe or control we can name. Scanner tools such as Semgrep contain thousands of rules; they are counted once. "
          "Categories 1-8 find problems (scanners, probes, template/doc checks); the rest are controls you embed, decision logic and process.", "",
+         "### Where the checks run, and what needs a server", "",
+         where_text(), "",
+         md_table(["Where it runs", "Checks", "Share", "What is in it"], where_rows()[0] + [("**Total**", f"**{len(D.INVENTORY)}**", "100%", "")]), "",
+         "Rows are not equal in weight (the 29 AI-agent rules are one row each), so treat the percentages as a guide.", "",
          "## 2. Status of every check", "",
          md_table(["Status", "Meaning", "Count"], [
              (D.V, "run end to end in this repo or on a real app", sum(1 for r in D.INVENTORY if r[5] == D.V)),
@@ -219,6 +244,8 @@ def write_readme():
     rows = [(c, D.CATEGORY_NOTES[c], len(v), TOOLS[c]) for c, v in cats.items()] + [("**Total**", "", f"**{len(D.INVENTORY)}**", f"{N_TOOLS} scanner tools plus the library and gate")]
     n_c, n_p, n_n = pc["Covered"], pc["Partial"], pc["Not covered"]
     block = "\n".join([a, md_table(["Category", "Question it answers", "Checks", "Tools"], rows), "",
+                       "**Where the checks run, and what needs a server.** " + where_text(), "",
+                       md_table(["Where it runs", "Checks", "Share", "What is in it"], where_rows()[0] + [("**Total**", f"**{len(D.INVENTORY)}**", "100%", "")]), "",
                        f"**Coverage of the Agentic Security presentation:** {total_pres} items checked: {n_c} covered, {n_p} partial, {n_n} not covered. "
                        "Details and the list of what is not covered are in [docs/test-coverage.md](docs/test-coverage.md). "
                        f"Roadmap: {sum(1 for r in D.ROADMAP if r[6] == 'Done')} done, {sum(1 for r in D.ROADMAP if r[6] == 'Partly')} partly, "

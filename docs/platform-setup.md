@@ -7,7 +7,7 @@ Create the repo **`mckesson-security-kit`** from this folder. Tag a release (`v1
 Upgrade policy: bump versions in `versions.env`, run `scripts/selftest.sh` and `scripts/test-onboarding.sh`, tag `v1.x`, announce. Teams upgrade with `warden init <repo>`.
 
 ## 2. Runners / agents
-Docker, bash, python3 >= 3.8, ~8 GB disk for images, outbound HTTPS to the hosts printed by `warden doctor` (ghcr.io, registry-1.docker.io, pypi.org, registry.npmjs.org, semgrep.dev, mirror.gcr.io). Behind a proxy/firewall: allow those hosts or mirror them; offline Semgrep rules via `SEC_SEMGREP_RULES`, Trivy DB via `TRIVY_DB_REPOSITORY`.
+Docker, bash, python3 >= 3.8, ~8 GB disk for images, outbound HTTPS to the hosts printed by `warden doctor` (ghcr.io, registry-1.docker.io, pypi.org, registry.npmjs.org, semgrep.dev, mirror.gcr.io). Behind a proxy/firewall: allow those hosts or mirror them; offline Semgrep rules via `warden rules fetch` + `SEC_SEMGREP_RULES`, Trivy DB via `TRIVY_DB_REPOSITORY` (details: [offline-and-blocked-networks.md](offline-and-blocked-networks.md)).
 Speed: pre-pull/bake images on self-hosted runners (`warden pull`) or push the two small scanner images (`warden-scanner:1`, `warden-scanner-node:1`, built from `docker/scanner*`) to your registry.
 
 ## 3. SonarQube (optional)

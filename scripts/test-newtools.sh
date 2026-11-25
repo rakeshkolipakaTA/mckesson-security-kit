@@ -175,4 +175,15 @@ grep -q "semgrep extra packs: none" "$T/pk2.log"; check "packs=none adds nothing
 scripts/scan.sh "$R" --out "$T/pk3" --partial --skip "$SKIPALL" >"$T/pk3.log" 2>&1
 grep -q "semgrep extra packs: .*p/security-audit.*p/fastapi.*p/dockerfile" "$T/pk3.log"; check "default adds security-audit, framework and Dockerfile packs for a Python app with a Dockerfile" 0 $?
 
+echo "== offline Semgrep rules (SEC_SEMGREP_RULES) for networks that block semgrep.dev"
+scripts/scan.sh "$R" --print-semgrep-packs 2>/dev/null | grep -qx "p/default" && scripts/scan.sh "$R" --print-semgrep-packs 2>/dev/null | grep -qx "p/security-audit"; check "--print-semgrep-packs lists the packs a download would need" 0 $?
+OR="$T/offline-repo"; mkdir -p "$OR/myrules"; printf 'def f(x):\n    return eval(x)\n' > "$OR/app.py"
+printf 'rules:\n- id: local-no-eval\n  languages: [python]\n  severity: ERROR\n  message: do not call eval\n  pattern: eval(...)\n' > "$OR/myrules/local.yml"
+SEC_SEMGREP_RULES=myrules scripts/scan.sh "$OR" --out "$T/off1" --partial --skip "$SKIPALL" >"$T/off1.log" 2>&1
+grep -q "semgrep rules: offline folder myrules" "$T/off1.log"; check "a repo-relative rules folder is used and nothing is downloaded" 0 $?
+pyj "$T/off1/summary.json" "d['by_tool'].get('semgrep',0)>=1"; check "the offline rule produces a finding" 0 $?
+SEC_SEMGREP_RULES=missing scripts/scan.sh "$OR" --out "$T/off2" --partial --skip "$SKIPALL" >"$T/off2.log" 2>&1
+grep -q "has no Semgrep rule files" "$T/off2.log"; check "a missing rules folder gives a clear error" 0 $?
+pyj "$T/off2/summary.json" "d['tool_status'].get('semgrep')!='ok'"; check "...and Semgrep is not reported as having run (the gate fails closed)" 0 $?
+
 echo; echo "new-tools test: $PASS passed, $FAILN failed"; [ "$FAILN" = 0 ]

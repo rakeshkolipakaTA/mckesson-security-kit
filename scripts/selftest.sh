@@ -19,6 +19,7 @@ python3 -I scripts/test_zap_auth.py >"$T/zauth.log" 2>&1; check "ZAP login types
 python3 -I scripts/test_creds.py >"$T/creds.log" 2>&1; check "local test-credential store (outside git, mode 600, profiles)" 0 $?; cp "$T/creds.log" "$T/last.log"
 python3 -I scripts/test_publish_external.py >"$T/pubext.log" 2>&1; check "publish to DefectDojo and Dependency-Track (mock servers: reimport, SBOM upload, branch filter, failures, no secret echo)" 0 $?; cp "$T/pubext.log" "$T/last.log"
 python3 -I scripts/test_wiz_scan.py >"$T/wiz.log" 2>&1; check "Wiz CLI runner (stand-in wizcli: no licence = nothing runs, secrets never printed, policy vs error, hash-checked install)" 0 $?; cp "$T/wiz.log" "$T/last.log"
+python3 -I scripts/test_semgrep_rules.py >"$T/rules.log" 2>&1; check "Semgrep offline-rules downloader (good pack saved, bad answer / missing pack / unreachable server fail, names validated, licence README)" 0 $?; cp "$T/rules.log" "$T/last.log"
 python3 -W ignore -I agentic/tests/test_agentsec_extra.py >"$T/agentx.log" 2>&1; check "agentsec extras (output integrity, classification, retention, secrets, PIP/PAP)" 0 $?; cp "$T/agentx.log" "$T/last.log"
 python3 -W ignore -I agentic/tests/test_sandbox_docker.py >"$T/sandbox.log" 2>&1; check "agent code sandbox contains hostile code (real Docker)" 0 $?; cp "$T/sandbox.log" "$T/last.log"
 python3 -I scripts/test_dashboard.py >"$T/dash.log" 2>&1; check "dashboard + publisher tests (auth, hostile input, ingest, views)" 0 $?; cp "$T/dash.log" "$T/last.log"

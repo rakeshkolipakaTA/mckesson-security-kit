@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Add the Warden security kit to ONE repository (per-project mode).
-#   warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--vendor] [--pin] [--source SRC]
-# Default (installed with pip): THIN - commits only config + CI + a version pin (warden.lock); the engine is installed from the pin.
-# --vendor (default when run from a framework checkout): copies the whole engine into .security/kit (works offline).
+#   warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--thin] [--pin] [--source SRC]
+# Default: VENDORED - copies the whole engine into .security/kit, so CI needs nothing from the Warden repository or package index.
+# --thin: commits only config + CI + a version pin (warden.lock); CI installs the engine from the pin (--source / --pin imply it).
 # Safe to re-run (= upgrade): refreshes generated files, never overwrites your config, exceptions or baseline.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T="$HERE/modes/per-project/templates"
-REPO="." CI=auto PRESET="" VENDOR="" PIN="" SOURCE="${WARDEN_SOURCE:-}"
+REPO="." CI=auto PRESET="" VENDOR="" PIN="" SOURCE="${WARDEN_SOURCE:-}" SOURCE_FLAG=""
 while [ $# -gt 0 ]; do
   case "$1" in --ci) CI="${2:?--ci needs github|jenkins|azure|all|none}"; shift 2;; --preset) PRESET="${2:?--preset needs starter|standard|strict}"; shift 2;;
-    --vendor) VENDOR=1; shift;; --thin) VENDOR=0; shift;; --pin) PIN=1; shift;; --source) SOURCE="${2:?--source needs a pip source}"; shift 2;; -h|--help) sed -n '2,7p' "$0"; exit 0;; -*) echo "unknown option $1" >&2; exit 2;; *) REPO="$1"; shift;; esac
+    --vendor) VENDOR=1; shift;; --thin) VENDOR=0; shift;; --pin) PIN=1; shift;; --source) SOURCE="${2:?--source needs a pip source}"; SOURCE_FLAG=1; shift 2;; -h|--help) sed -n '2,6p' "$0"; exit 0;; -*) echo "unknown option $1" >&2; exit 2;; *) REPO="$1"; shift;; esac
 done
-[ -d "${REPO:-}" ] || { echo "usage: warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset ...] [--vendor]" >&2; exit 2; }
+[ -d "${REPO:-}" ] || { echo "usage: warden init [repo-path] [--ci github|jenkins|azure|all|none] [--preset ...] [--thin]" >&2; exit 2; }
 REPO="$(cd "$REPO" && pwd)"; S="$REPO/.security"; KIT="$S/kit"
 case "$CI" in auto|github|jenkins|azure|all|none) ;; *) echo "--ci must be github|jenkins|azure|all|none" >&2; exit 2;; esac
 if [ "$CI" = auto ]; then
@@ -25,9 +25,9 @@ fi
 case "$PRESET" in ""|starter|standard|strict) ;; *) echo "--preset must be starter|standard|strict" >&2; exit 2;; esac
 PROFILES="$("$HERE/scripts/scan.sh" "$REPO" --print-profiles)"
 UPGRADE=0; [ -d "$KIT" ] || [ -f "$S/warden.lock" ] && UPGRADE=1
-# mode: an existing repo keeps its mode; otherwise thin when installed with pip (WARDEN_VERSION is set by the pip entry point), vendored from a checkout
+# mode: an existing repo keeps its mode; otherwise vendored (the default). --thin, --pin or --source choose thin
 if [ -z "$VENDOR" ]; then
-  if [ -d "$KIT" ]; then VENDOR=1; elif [ -f "$S/warden.lock" ] && grep -q '^mode=thin' "$S/warden.lock"; then VENDOR=0; elif [ -n "${WARDEN_VERSION:-}" ]; then VENDOR=0; else VENDOR=1; fi
+  if [ -d "$KIT" ]; then VENDOR=1; elif [ -f "$S/warden.lock" ] && grep -q '^mode=thin' "$S/warden.lock"; then VENDOR=0; elif [ -n "$PIN" ] || [ -n "$SOURCE_FLAG" ]; then VENDOR=0; else VENDOR=1; fi
 fi
 VERSION_NOW="${WARDEN_VERSION:-$(cat "$HERE/VERSION" 2>/dev/null || echo local)}"
 
@@ -36,9 +36,10 @@ mkdir -p "$S/ci"
 if [ "$VENDOR" = 1 ]; then
 rm -rf "$KIT"; mkdir -p "$KIT/scripts" "$KIT/docker"
 cp "$HERE/versions.env" "$KIT/"
-cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/warden" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$KIT/scripts/"
+cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/warden" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$HERE/scripts/gh_report.py" "$HERE/scripts/publish_external.py" "$HERE/scripts/wiz_scan.py" "$HERE/scripts/zap_auth.py" "$HERE/scripts/creds.py" "$HERE/scripts/tickets.py" "$HERE/scripts/semgrep_rules.py" "$KIT/scripts/"
 mkdir -p "$KIT/agentic" && cp -r "$HERE/agentic/agentsec" "$KIT/agentic/agentsec" && find "$KIT/agentic" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$HERE/configs" "$KIT/configs"
+find "$KIT/configs" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$HERE/docker/scanner" "$HERE/docker/scanner-node" "$KIT/docker/"
 echo "kit $(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || echo local) $(date +%Y-%m-%d)" > "$KIT/VERSION"
 chmod +x "$KIT/scripts/"*

@@ -172,9 +172,9 @@ INVENTORY.sort(key=lambda r: CATEGORY_ORDER.index(r[0]))   # stable: keeps the o
 # our own regression tests (what proves the framework works)
 SUITES = [
  ("scripts/selftest.sh", "Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing, Wiz CLI runner", 26),
- ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers", 83),
- ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode, ci-report, auto-update channel, pin, release script and roll", 89),
- ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs", 46),
+ ("scripts/test-onboarding.sh", "Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers; self-contained vendored kit", 87),
+ ("scripts/test-package.sh", "pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode (the default), thin mode, ci-report, auto-update channel, pin, release script and roll", 91),
+ ("scripts/test-newtools.sh", "SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs; offline Semgrep rules", 51),
  ("scripts/e2e-agent.sh", "Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain", 12),
  ("scripts/test_gate.py", "Finding identity, de-duplication, exclusions, waivers, dated baseline, SLA, control mapping (unit)", 28),
  ("scripts/test_toolplan.py", "Presets, per-tool switches, required-tool lock, waivers, opt-in git history (unit)", 17),
@@ -185,6 +185,7 @@ SUITES = [
  ("scripts/test_creds.py", "Local credential store: names only in lists, mode 600, profiles, refuses git working trees", 4),
  ("scripts/test_gh_report.py", "GitHub summary, annotations, one pull request comment, escaping, limits, fork degradation (mock GitHub API)", 17),
  ("scripts/test_publish_external.py", "DefectDojo reimport, Dependency-Track SBOM upload and Wiz result import against mock servers: field mapping, branch filter, failures are warnings, no secret echo, dry run (unit)", 18),
+ ("scripts/test_semgrep_rules.py", "Semgrep rule downloader against a local server: good pack saved and counted, README with licence note, bad answer / missing pack / unreachable server fail, names validated before any download", 7),
  ("scripts/test_wiz_scan.py", "Wiz CLI runner with a stand-in wizcli: no licence runs nothing, commands, secrets never printed, policy failure vs error, enforcement, hash-checked install, warden wiz via scan.sh (unit)", 14),
  ("scripts/test_tools.py", "Exposure, repo-posture and API-fuzz helpers (unit)", 7),
  ("agentic/tests/test_agentsec.py", "Runtime-controls library (unit)", 24),
@@ -403,3 +404,32 @@ GLOSSARY = [
  ("People and process", "Training, reviews, threat modelling, penetration tests.", "Not a tool: needs to be run by the team"),
 ]
 
+
+
+# ---- Where each check runs (used for the "without any server" figures in README and test-coverage.md)
+RUNS_SERVER = {"SonarQube (Community)", "Dependency-Track (SBOM monitoring)", "DefectDojo publishing (findings register)",
+               "Wiz CLI scans in the pipeline (dir, iac, image)", "Wiz cloud scanning of Azure (connector guide)",
+               "Central dashboard", "Dashboard SLA tracking", "Alert webhooks (Slack / Teams compatible)"}
+RUNS_OTHER = {"Live cluster posture (kubescape / kube-bench / trivy k8s)", "Cloud account posture (Prowler)",
+              "Pre-push hook (warden quick)", "pre-commit config, PR template, CODEOWNERS snippet", "IDE recommendations (.vscode)",
+              "Falco rules for agent workloads", "SIEM shipping recipe (Sentinel / Datadog)", "Process kit (9 documents)"}
+WHERE_ORDER = ("actions", "qa", "server", "other")
+WHERE_LABEL = {
+    "actions": ("In GitHub Actions, on the code only", "Needs nothing but the repository"),
+    "qa": ("In GitHub Actions, against a running test app", "ZAP, API fuzzing and AI-agent red-team probes: need a deployed QA app, no server of ours"),
+    "server": ("Needs a server or a licence", "SonarQube, DefectDojo, Dependency-Track, Wiz, Warden dashboard (with its SLA tracking and alert webhooks)"),
+    "other": ("Not a pipeline scan", "Runtime library modules, live cluster and cloud account checks, Falco, SIEM, process kit, developer-machine items"),
+}
+
+
+def where_runs(row):
+    """Return one of WHERE_ORDER for an INVENTORY row."""
+    if row[1] in RUNS_SERVER:
+        return "server"
+    if row[0].startswith("AI agent: runtime"):
+        return "other"
+    if row[1] in RUNS_OTHER:
+        return "other"
+    if row[0] in ("Dynamic testing (DAST)", "AI agent: red-team probes") or "ZAP" in row[1] or "Schemathesis" in row[1]:
+        return "qa"
+    return "actions"

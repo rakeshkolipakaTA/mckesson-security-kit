@@ -71,4 +71,12 @@ printf '{"gates":{"pr":{"block_new":[],"block_existing":[]}},"severity_order":["
 echo "== git hook"
 ( cd "$T/python-clean" && .security/warden hook install >/dev/null 2>&1 && [ -x .git/hooks/pre-push ] ); check "pre-push hook installs" 0 $?
 
+echo "== vendored kit is self-contained (nothing fetched from our repo)"
+r="$T/vendored"; cp -a examples/clean-python "$r"; rm -rf "$r/.security"; git -C "$r" init -q 2>/dev/null
+scripts/warden init "$r" --vendor --ci github >/dev/null 2>&1; check "vendored init succeeds" 0 $?
+miss=""; for f in $(grep -ohE '(HERE|ROOT)/scripts/[A-Za-z_]+\.py' "$r/.security/kit/scripts/warden" "$r/.security/kit/scripts/scan.sh" | sed 's|.*/||' | sort -u); do [ -f "$r/.security/kit/scripts/$f" ] || miss="$miss $f"; done
+[ -z "$miss" ] && check "every script the engine calls is inside .security/kit" 0 0 || { echo "    missing:$miss"; check "every script the engine calls is inside .security/kit" 0 1; }
+( cd "$r" && .security/warden creds list >/dev/null 2>&1 ); check "vendored kit runs creds (copied helper works)" 0 $?
+grep -qE 'git\+https|pip install|rakeshkolipakaTA' "$r/.github/workflows/security-scan.yml" "$r/.security/warden" && check "workflow and launcher do not fetch our repo" 0 1 || check "workflow and launcher do not fetch our repo" 0 0
+
 echo; echo "onboarding test: $PASS passed, $FAILN failed"; [ "$FAILN" = 0 ]

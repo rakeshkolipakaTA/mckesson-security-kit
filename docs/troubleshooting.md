@@ -12,7 +12,7 @@
 | Secret false positive in test data | Allowlist in `.security/gitleaks.toml`, or a time-boxed exception. |
 | Dependency-Check very slow first time | NVD download without `NVD_API_KEY`; request a key and keep the `warden-depcheck-data` volume. |
 | `warden doctor` shows a host as NOT reachable | A proxy/firewall blocks it. Ask the platform team to allow it or mirror it (see platform-setup.md). |
-| Semgrep: `Failed to download` / no rules | `semgrep.dev` blocked. Use offline rules: `SEC_SEMGREP_RULES=/path/to/rules` in config.env. |
+| Semgrep: `Failed to download` / no rules | `semgrep.dev` blocked (the gate fails closed: "semgrep=missing"). Download the rules once where it is reachable (`warden rules fetch`), then `warden config set SEC_SEMGREP_RULES .security/semgrep-rules`: [offline-and-blocked-networks.md](offline-and-blocked-networks.md). |
 | `npm-audit` shows `invalid` | The audit returned an error (no network to the npm registry, or private registry auth). Check `<report>/npm-audit-<n>.log`. |
 | "no lockfile ... audited versions were freshly resolved" | Commit `package-lock.json`. |
 | eslint `invalid` / missing | ESLint crashed (see the scan output); check that your JS/TS files are valid syntax. |
