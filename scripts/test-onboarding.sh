@@ -71,6 +71,16 @@ printf '{"gates":{"pr":{"block_new":[],"block_existing":[]}},"severity_order":["
 echo "== git hook"
 ( cd "$T/python-clean" && .security/warden hook install >/dev/null 2>&1 && [ -x .git/hooks/pre-push ] ); check "pre-push hook installs" 0 $?
 
+echo "== empty or new repo: sensible defaults, stacks picked up later without re-running init"
+r="$T/emptyrepo"; mkdir -p "$r"; git -C "$r" init -q 2>/dev/null
+out="$(scripts/warden init "$r" --ci github 2>&1)"; check "init works in an empty repo" 0 $?
+grep -q "detected stack : generic" <<< "$out"; check "an empty repo is 'generic', not an AI-agent repo" 0 $?
+grep -q "no code detected yet" <<< "$out"; check "init explains that language checks start by themselves" 0 $?
+o="$(cd "$r" && .security/warden config show 2>&1)"; grep -qE '^  (gitleaks|semgrep|trivy-fs) +RUN' <<< "$o" && grep -qE '^  agent-scan +skip' <<< "$o"; check "stack-independent checks run and agent-scan stays off" 0 $?
+printf 'flask==3.0.0\n' > "$r/requirements.txt"; printf 'print(1)\n' > "$r/app.py"
+o="$(cd "$r" && .security/warden config show 2>&1)"; grep -qE '^  pip-audit +RUN' <<< "$o" && grep -q 'stacks=python' <<< "$o"; check "adding Python files later switches the Python checks on (no re-init)" 0 $?
+for ex in java-sample iac-sample; do p="$(scripts/scan.sh "examples/$ex" --print-profiles)"; grep -qw agent <<< "$p" && check "$ex is not mistaken for an AI-agent repo" 0 1 || check "$ex is not mistaken for an AI-agent repo" 0 0; done
+
 echo "== vendored kit is self-contained (nothing fetched from our repo)"
 r="$T/vendored"; cp -a examples/clean-python "$r"; rm -rf "$r/.security"; git -C "$r" init -q 2>/dev/null
 scripts/warden init "$r" --vendor --ci github >/dev/null 2>&1; check "vendored init succeeds" 0 $?

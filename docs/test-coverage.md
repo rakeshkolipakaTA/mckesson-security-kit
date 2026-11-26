@@ -1,6 +1,6 @@
 # What we test: coverage by category
 
-Generated from `tools/coverage_data.py` on 2026-11-25. The same data is in [security-test-coverage.xlsx](security-test-coverage.xlsx) (filterable, with roadmap and glossary).
+Generated from `tools/coverage_data.py` on 2026-11-26. The same data is in [security-test-coverage.xlsx](security-test-coverage.xlsx) (filterable, with roadmap and glossary).
 
 ## 1. Categories and how many checks each has
 
@@ -124,7 +124,7 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | Suite | What it proves | Checks |
 |---|---|---|
 | scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing, Wiz CLI runner | 26 |
-| scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers; self-contained vendored kit | 87 |
+| scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers; self-contained vendored kit; empty and new repos | 94 |
 | scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode (the default), thin mode, ci-report, auto-update channel, pin, release script and roll | 91 |
 | scripts/test-newtools.sh | SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs; offline Semgrep rules | 51 |
 | scripts/e2e-agent.sh | Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain | 12 |
@@ -144,4 +144,4 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
 | agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
 | agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
-| **Total** |  | **541** |
+| **Total** |  | **548** |

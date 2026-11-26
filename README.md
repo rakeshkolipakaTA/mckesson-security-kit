@@ -3,10 +3,10 @@
 Reference implementation of a central DevSecOps scanning plan: one framework, tools for every layer, templates for GitHub Actions / Jenkins / Azure DevOps,
 and guides written so that **a developer with no DevOps help can onboard a repo in about 10 minutes**.
 
-**Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)** (or the one-page [developer guide](docs/warden-developer-guide.md)). Version 1 runs entirely in GitHub Actions and shows results in GitHub (pull request comment, file markers, run summary, report artifact): [docs/github-only-quickstart.md](docs/github-only-quickstart.md). **`warden init` copies the whole engine into the repo (`.security/kit`), so GitHub Actions needs no access to our repository: [docs/per-project-mode.md](docs/per-project-mode.md#self-contained-repo-the-default-no-access-to-our-repository-needed). Networks that block semgrep.dev: [docs/offline-and-blocked-networks.md](docs/offline-and-blocked-networks.md).** The dashboard is optional and can be added later. Release notes: [CHANGELOG.md](CHANGELOG.md).
+**Start here: [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)** (or the one-page [developer guide](docs/warden-developer-guide.md); setup, guidelines and troubleshooting for Warden and the Claude Cost Kit together: [docs/developer-setup-guide.md](docs/developer-setup-guide.md)). Version 1 runs entirely in GitHub Actions and shows results in GitHub (pull request comment, file markers, run summary, report artifact): [docs/github-only-quickstart.md](docs/github-only-quickstart.md). **`warden init` copies the whole engine into the repo (`.security/kit`), so GitHub Actions needs no access to our repository: [docs/per-project-mode.md](docs/per-project-mode.md#self-contained-repo-the-default-no-access-to-our-repository-needed). Networks that block semgrep.dev: [docs/offline-and-blocked-networks.md](docs/offline-and-blocked-networks.md).** The dashboard is optional and can be added later. Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
-pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@v1.0.2"   # once, in a venv (team lead)
+pip install "git+https://github.com/rakeshkolipakaTA/mckesson-security-kit.git@main"   # once, in a venv (team lead)
 cd your-repo
 warden init                                 # add scanning (+ GitHub workflow); report-only preset "starter"
 .security/warden doctor                     # check Docker/network

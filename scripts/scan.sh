@@ -188,6 +188,8 @@ log() { printf '\n[%s] %s\n' "$(date +%T)" "$*"; }
 PRUNE=(\( -name .git -o -name .venv -o -name venv -o -name node_modules -o -name .security -o -name build -o -name dist -o -name site-packages -o -name target -o -name __pycache__ \) -prune -o)
 find_files() { find "$REPO" -maxdepth 5 "${PRUNE[@]}" -type f \( "$@" \) -print 2>/dev/null; }
 has_files() { [ -n "$(find_files "$@" | head -1)" ]; }
+# true when a file in the list on stdin matches; an EMPTY list is a no (plain 'xargs -r grep -q' succeeds on empty input, which made empty and IaC-only repos look like AI-agent repos)
+any_file_matches() { local list; list="$(cat)"; [ -n "$list" ] && printf '%s\n' "$list" | xargs grep -q "$@" 2>/dev/null; }
 PROFILES=()
 if [ "$SEC_PROFILE" = auto ]; then
   has_files -name 'pyproject.toml' -o -name 'setup.py' -o -name 'requirements*.txt' -o -name 'Pipfile' -o -name '*.py' && PROFILES+=(python)
@@ -196,8 +198,8 @@ if [ "$SEC_PROFILE" = auto ]; then
   # agentic AI: MCP config, or an agent/LLM framework in a dependency manifest or an import
   AGENT_FW='langchain|langgraph|llama[-_]index|openai|anthropic|autogen|crewai|fastmcp|(^|[^a-z])mcp([^a-z]|$)|semantic[-_]kernel|strands|pydantic[-_]ai|google-generativeai|dspy|haystack'
   if has_files -name '.mcp.json' -o -name 'mcp.json' -o -name 'claude_desktop_config.json' \
-     || { find_files -name 'requirements*.txt' -o -name 'pyproject.toml' -o -name 'package.json' -o -name 'Pipfile'; } | xargs -r grep -qiE "$AGENT_FW" 2>/dev/null \
-     || find_files -name '*.py' | xargs -r grep -qE "^[[:space:]]*(import|from)[[:space:]]+(langchain|langgraph|llama_index|openai|anthropic|autogen|crewai|fastmcp|mcp|semantic_kernel|strands|pydantic_ai|dspy|haystack)" 2>/dev/null; then PROFILES+=(agent); fi
+     || { find_files -name 'requirements*.txt' -o -name 'pyproject.toml' -o -name 'package.json' -o -name 'Pipfile'; } | any_file_matches -iE "$AGENT_FW" \
+     || find_files -name '*.py' | any_file_matches -E "^[[:space:]]*(import|from)[[:space:]]+(langchain|langgraph|llama_index|openai|anthropic|autogen|crewai|fastmcp|mcp|semantic_kernel|strands|pydantic_ai|dspy|haystack)"; then PROFILES+=(agent); fi
   [ ${#PROFILES[@]} -gt 0 ] || PROFILES=(generic)
 else
   IFS=',' read -ra PROFILES <<< "$SEC_PROFILE"

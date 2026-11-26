@@ -116,6 +116,7 @@ if [ ! -e "$REPO/.vscode/settings.json" ]; then mkdir -p "$REPO/.vscode"; cp "$T
 echo
 echo "Security kit $([ $UPGRADE = 1 ] && echo upgraded || echo installed) in $S"
 echo "  detected stack : $PROFILES"
+[ "$PROFILES" != generic ] || echo "  no code detected yet: the checks that need no language (secrets, workflow security, Dockerfile / Kubernetes / Helm / Terraform settings, libraries once a manifest exists) run now. Python, Node, Java and AI-agent checks start by themselves when those files appear; nothing to re-run."
 echo "  engine         : $([ "$VENDOR" = 1 ] && echo "vendored in .security/kit (works offline)" || { [ "${CHANNEL:-}" = auto ] && echo "thin, follows the newest release automatically (channel=auto in .security/warden.lock)" || echo "thin, pinned to warden $VERSION_NOW in .security/warden.lock"; })"
 echo "  preset         : $(grep -m1 '^SEC_PRESET=' "$S/config.env" | cut -d= -f2) (set in .security/config.env; 'starter' = report-only, scans never fail your build yet)"
 [ -n "$INSTALLED" ] && echo "  CI added       : $INSTALLED (GitHub Actions, report-only)"
