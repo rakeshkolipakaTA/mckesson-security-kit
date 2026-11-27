@@ -124,7 +124,7 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | Suite | What it proves | Checks |
 |---|---|---|
 | scripts/selftest.sh | Gate logic, fail-closed, baseline, exceptions, degraded manifests, npm peer-conflict, tool plan, dashboard, platform templates, GitHub reporting, ZAP login types, credential store, DefectDojo / Dependency-Track publishing, Wiz CLI runner | 26 |
-| scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers; self-contained vendored kit; empty and new repos; ZAP on request (settings file, allowed hosts, production and credential guards, only ZAP runs, workflow template safety) | 132 |
+| scripts/test-onboarding.sh | Developer journey on python / node / java / clean / agent repos; malicious config; tool switches; waivers; self-contained vendored kit; empty and new repos; ZAP on request (settings file, allowed hosts, production and credential guards, only ZAP runs, workflow template safety) | 133 |
 | scripts/test-package.sh | pip install in a clean venv, thin init, shim, disable/enable, upgrade, uninstall, vendored mode (the default), thin mode, ci-report, auto-update channel, pin, release script and roll | 91 |
 | scripts/test-newtools.sh | SBOM, licences, git history (opt-in, commit limit, shallow fetch), workflow scan, cluster posture, IaC, exposure, repo posture, API fuzz, authenticated ZAP (token, login, form, failed login), config secrets refused, extra SAST packs; offline Semgrep rules; warden zap end to end (real ZAP, only ZAP runs, refused target gets no traffic) | 57 |
 | scripts/e2e-agent.sh | Vulnerable vs hardened agent: rules, probes, inventory, model scan, audit chain | 12 |
@@ -146,4 +146,4 @@ Our scans are **application and delivery-pipeline security** (the first rows), p
 | agentic/tests/test_agentsec_extra.py | Lineage, classification, retention, encrypted store, policy admin, network egress (unit) | 54 |
 | agentic/tests/test_sandbox_docker.py | Agent code-execution sandbox in real Docker: no network, read-only, limits | 17 |
 | agentic/tests/test_vault_docker.py | Vault secrets and rotation against a real Vault container | 8 |
-| **Total** |  | **636** |
+| **Total** |  | **637** |

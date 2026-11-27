@@ -36,7 +36,7 @@ mkdir -p "$S/ci"
 if [ "$VENDOR" = 1 ]; then
 rm -rf "$KIT"; mkdir -p "$KIT/scripts" "$KIT/docker"
 cp "$HERE/versions.env" "$KIT/"
-cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/warden" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$HERE/scripts/gh_report.py" "$HERE/scripts/publish_external.py" "$HERE/scripts/wiz_scan.py" "$HERE/scripts/zap_auth.py" "$HERE/scripts/creds.py" "$HERE/scripts/tickets.py" "$HERE/scripts/semgrep_rules.py" "$KIT/scripts/"
+cp "$HERE/scripts/scan.sh" "$HERE/scripts/toolplan.py" "$HERE/scripts/gate.py" "$HERE/scripts/assessment.py" "$HERE/scripts/warden" "$HERE/scripts/agent_scan.py" "$HERE/scripts/redteam.py" "$HERE/scripts/publish.py" "$HERE/scripts/exposure.py" "$HERE/scripts/repo_posture.py" "$HERE/scripts/api_fuzz_report.py" "$HERE/scripts/gh_report.py" "$HERE/scripts/publish_external.py" "$HERE/scripts/wiz_scan.py" "$HERE/scripts/zap_auth.py" "$HERE/scripts/creds.py" "$HERE/scripts/tickets.py" "$HERE/scripts/semgrep_rules.py" "$KIT/scripts/"
 mkdir -p "$KIT/agentic" && cp -r "$HERE/agentic/agentsec" "$KIT/agentic/agentsec" && find "$KIT/agentic" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$HERE/configs" "$KIT/configs"
 find "$KIT/configs" -name __pycache__ -prune -exec rm -rf {} +

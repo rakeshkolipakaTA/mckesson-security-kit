@@ -86,6 +86,7 @@ r="$T/vendored"; cp -a examples/clean-python "$r"; rm -rf "$r/.security"; git -C
 scripts/warden init "$r" --vendor --ci github >/dev/null 2>&1; check "vendored init succeeds" 0 $?
 miss=""; for f in $(grep -ohE '(HERE|ROOT)/scripts/[A-Za-z_]+\.py' "$r/.security/kit/scripts/warden" "$r/.security/kit/scripts/scan.sh" | sed 's|.*/||' | sort -u); do [ -f "$r/.security/kit/scripts/$f" ] || miss="$miss $f"; done
 [ -z "$miss" ] && check "every script the engine calls is inside .security/kit" 0 0 || { echo "    missing:$miss"; check "every script the engine calls is inside .security/kit" 0 1; }
+[ -f "$r/.security/kit/scripts/assessment.py" ]; check "vendored kit has the assessment report writer (gate.py loads it by path, so the check above cannot see it)" 0 $?
 ( cd "$r" && .security/warden creds list >/dev/null 2>&1 ); check "vendored kit runs creds (copied helper works)" 0 $?
 grep -qE 'git\+https|pip install|rakeshkolipakaTA' "$r/.github/workflows/security-scan.yml" "$r/.security/warden" && check "workflow and launcher do not fetch our repo" 0 1 || check "workflow and launcher do not fetch our repo" 0 0
 
