@@ -1,42 +1,71 @@
-# .github/workflows/security-dast.yml - dynamic scan (OWASP ZAP) of your RUNNING QA/UAT app.
-# NEVER point this at production. The runner must be able to reach the URL (QA behind a VPN needs a self-hosted runner).
-# Set the repo variable QA_URL, e.g. https://myapp-qa.example.com
-# Run it after your QA deployment job (add `needs: deploy-qa` or trigger manually / weekly as below).
+# .github/workflows/security-dast.yml - ZAP dynamic test of your RUNNING QA / UAT app. NEVER production.
+# Starts on request (Actions > security-dast > Run workflow: pick the environment and the mode) and every Monday as a passive baseline.
+# Settings live in .security/zap/<environment>.env (targets, allowed hosts, login type; no secrets). Secrets live in the GitHub Environment of the same name.
+# One-time setup: docs/warden-developer-guide.md ("Run a ZAP test on your running QA app").
 name: security-dast
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Which environment to test (settings in .security/zap/<environment>.env)
+        type: choice
+        options: [qa, uat]
+        default: qa
+      mode:
+        description: baseline = passive and safe | api = from an OpenAPI spec | full = ACTIVE attack scan (needs a reviewer's approval)
+        type: choice
+        options: [baseline, api, full]
+        default: baseline
   schedule:
-    - cron: '0 3 * * 1'     # Mondays 03:00 UTC
+    - cron: '0 3 * * 1'     # Mondays 03:00 UTC: passive baseline of qa only
 permissions:
   contents: read
+concurrency:
+  group: security-dast-${{ inputs.environment || 'qa' }}
+  cancel-in-progress: false  # never stop a scan half way; a second request waits
 jobs:
+  approve-active-scan:
+    # An active scan sends attack traffic. It waits here until a reviewer of the "zap-active-approval" environment approves
+    # (Settings > Environments > zap-active-approval > Required reviewers).
+    if: ${{ inputs.mode == 'full' }}
+    runs-on: ubuntu-latest
+    environment: zap-active-approval
+    timeout-minutes: 5
+    steps:
+      - name: Approved
+        env:
+          ZAP_ENV: ${{ inputs.environment }}
+        run: echo "An active (attack) scan of $ZAP_ENV was approved."
   zap:
-    runs-on: ubuntu-latest      # EDIT: self-hosted runner if QA is not public
+    needs: approve-active-scan
+    if: ${{ !cancelled() && (needs.approve-active-scan.result == 'success' || needs.approve-active-scan.result == 'skipped') }}
+    runs-on: ubuntu-latest      # EDIT: a self-hosted runner if the QA app is not reachable from the internet
+    # The environment releases ONLY its own secrets to this job (and can require reviewers or limit branches).
+    environment: ${{ inputs.environment || 'qa' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
-      - name: ZAP baseline (passive, safe)
+      - name: ZAP test
         env:
-          QA_URL: ${{ vars.QA_URL }}
-          # To scan BEHIND a login, set SEC_ZAP_AUTH (and the login URL) in .security/config.env, then uncomment what your login type needs.
-          # Usernames, passwords and tokens are CI secrets, never files in the repo. Putting them in an "Environment" (add `environment: qa` to the job)
-          # releases them only to this job. Login types, SSO and secret managers: docs/zap-authentication.md
+          ZAP_ENV: ${{ inputs.environment || 'qa' }}
+          ZAP_MODE: ${{ inputs.mode || 'baseline' }}
+          # Only for an app with a login: set SEC_ZAP_AUTH and SEC_ZAP_LOGIN_URL in .security/zap/<environment>.env, add the matching secrets to the
+          # GitHub Environment, and uncomment ONLY what your login type needs. Types and SSO: docs/zap-authentication.md
           # ZAP_AUTH_USER: ${{ secrets.ZAP_AUTH_USER }}
           # ZAP_AUTH_PASSWORD: ${{ secrets.ZAP_AUTH_PASSWORD }}
           # ZAP_AUTH_TOKEN: ${{ secrets.ZAP_AUTH_TOKEN }}                  # a ready-made bearer token
           # ZAP_OAUTH_CLIENT_ID: ${{ secrets.ZAP_OAUTH_CLIENT_ID }}        # SSO (OpenID Connect / OAuth2) client
           # ZAP_OAUTH_CLIENT_SECRET: ${{ secrets.ZAP_OAUTH_CLIENT_SECRET }}
-        run: .security/warden scan --zap-url "$QA_URL" --zap-mode baseline
-        # For APIs, passive crawling finds little. Use an ACTIVE scan of specific URLs WITH parameters
-        # (QA only, with the owners' approval):
-        #   .security/warden scan --zap-mode full --zap-url "$QA_URL/search?q=test,$QA_URL/items/1"
+        # The inputs reach the shell only through env variables, never pasted into the script text. warden checks the name and the mode itself.
+        run: .security/warden zap "$ZAP_ENV" "$ZAP_MODE"
       - name: Show results on the run page
         if: always()
         run: .security/warden ci-report --no-comment
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
-          name: zap-report
+          name: zap-report-${{ inputs.environment || 'qa' }}
           path: .security/reports/20*/summary.html
+          retention-days: 14

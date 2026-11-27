@@ -53,6 +53,7 @@ jobs:
           name: security-report
           path: |
             .security/reports/20*/summary.html
+            .security/reports/20*/assessment.html
             .security/reports/20*/summary.md
             .security/reports/20*/results.sarif
             .security/reports/20*/sbom.cdx.json

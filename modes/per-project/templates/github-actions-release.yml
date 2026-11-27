@@ -38,6 +38,7 @@ jobs:
           name: security-release-report
           path: |
             .security/reports/20*/summary.html
+            .security/reports/20*/assessment.html
             .security/reports/20*/summary.md
             .security/reports/20*/sbom.cdx.json
       # Only reached when the gate above passed:

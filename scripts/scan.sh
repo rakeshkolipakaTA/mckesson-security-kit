@@ -30,6 +30,8 @@
 #   --zap-mode baseline|api|full   SEC_ZAP_MODE   baseline = passive crawl (finds little on pure APIs); api = OpenAPI import (needs
 #                           --zap-openapi); full = ACTIVE scan of every URL in --zap-url (give URLs WITH query parameters)
 #   --zap-network NET       SEC_ZAP_NETWORK  docker network the target lives on     --zap-openapi URL  SEC_ZAP_OPENAPI
+#   --zap-config FILE       a file of ZAP settings (SEC_ZAP_URL, SEC_ZAP_MODE, SEC_ZAP_AUTH, ...) read only for this run, e.g. .security/zap/qa.env (see `warden zap`)
+#                           SEC_ZAP_ALLOWED_HOSTS=host,*.suffix  the ZAP run stops before any traffic if a target host is not listed; without it, hosts that look like production are refused
 #   --baseline FILE | --write-baseline   record today's findings as "existing" (default file <repo>/.security/baseline.json)
 #   --sec-dir DIR           project config dir (default <repo>/.security): config.env, exceptions.json, baseline.json, overrides
 #   --out DIR               report directory (default <reports>/<timestamp>, with a `latest` link)
@@ -45,14 +47,14 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/versions.env"
 
-REPO="" OUT="" SEC_DIR_ARG="" BASELINE="" WRITE_BASELINE=0 PRINT_PROFILES=0 PRINT_SEMGREP_PACKS=0 EXPLAIN=0 PARTIAL=0 PUBLISH_LATEST=0 PUBLISH_DRY= WIZ_MODE=0
+REPO="" OUT="" SEC_DIR_ARG="" ZAP_CONFIG_ARG="" BASELINE="" WRITE_BASELINE=0 PRINT_PROFILES=0 PRINT_SEMGREP_PACKS=0 EXPLAIN=0 PARTIAL=0 PUBLISH_LATEST=0 PUBLISH_DRY= WIZ_MODE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --profile) SEC_PROFILE="$2"; shift 2;; --gate) SEC_GATE="$2"; shift 2;; --enforce) SEC_ENFORCE=1; shift;;
     --skip) SEC_SKIP="$2"; shift 2;; --no-semgrep) SEC_SKIP="${SEC_SKIP:+$SEC_SKIP,}semgrep"; shift;;
     --sonar) SEC_SONAR=on; shift;; --sonar-key) SEC_SONAR_KEY="$2"; shift 2;; --depcheck) SEC_DEPCHECK=on; shift;;
     --image) SEC_IMAGE="$2"; shift 2;; --zap-url) SEC_ZAP_URL="$2"; shift 2;; --zap-mode) SEC_ZAP_MODE="$2"; shift 2;;
-    --zap-network) SEC_ZAP_NETWORK="$2"; shift 2;; --zap-openapi) SEC_ZAP_OPENAPI="$2"; shift 2;;
+    --zap-config) ZAP_CONFIG_ARG="$2"; shift 2;; --zap-network) SEC_ZAP_NETWORK="$2"; shift 2;; --zap-openapi) SEC_ZAP_OPENAPI="$2"; shift 2;;
     --baseline) BASELINE="$2"; shift 2;; --write-baseline) WRITE_BASELINE=1; shift;;
     --redteam-url) SEC_REDTEAM_URL="$2"; shift 2;; --redteam-network) SEC_REDTEAM_NETWORK="$2"; shift 2;; --redteam-contract) SEC_REDTEAM_CONTRACT="$2"; shift 2;;
     --preset) SEC_PRESET="$2"; shift 2;; --partial) PARTIAL=1; shift;; --explain) EXPLAIN=1; shift;; --publish-latest) PUBLISH_LATEST=1; shift;; --dry-run) PUBLISH_DRY=--dry-run; shift;; --wiz) WIZ_MODE=1; shift;; --exclude) SEC_EXCLUDE_PATHS="$2"; shift 2;;
@@ -71,7 +73,7 @@ REPO="$(cd "$REPO" && pwd)"; NAME="$(basename "$REPO")"
 SEC_DIR="${SEC_DIR_ARG:-$REPO/.security}"; [ -d "$SEC_DIR" ] && SEC_DIR="$(cd "$SEC_DIR" && pwd)"
 
 # ---- config.env: parsed, never sourced (a pull request must not be able to run code on the scanner) ----
-CONFIG_KEYS=" SEC_ZAP_AUTH SEC_ZAP_LOGIN_URL SEC_ZAP_LOGIN_PAGE SEC_ZAP_USER_FIELD SEC_ZAP_PASSWORD_FIELD SEC_ZAP_CSRF_FIELD SEC_ZAP_LOGIN_EXTRA SEC_ZAP_TOKEN_PATH SEC_ZAP_OAUTH_SCOPE SEC_ZAP_OAUTH_AUDIENCE SEC_ZAP_OAUTH_CLIENT_AUTH SEC_CREDENTIALS_PROFILE SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DEFECTDOJO_URL SEC_DEFECTDOJO_PRODUCT SEC_DEFECTDOJO_PRODUCT_TYPE SEC_DEFECTDOJO_BRANCHES SEC_DTRACK_URL SEC_DTRACK_PROJECT SEC_DTRACK_BRANCHES SEC_WIZ_SCANS SEC_WIZ_ENFORCE SEC_WIZCLI SEC_WIZCLI_URL SEC_WIZCLI_SHA256 SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
+CONFIG_KEYS=" SEC_ZAP_AUTH SEC_ZAP_LOGIN_URL SEC_ZAP_LOGIN_PAGE SEC_ZAP_USER_FIELD SEC_ZAP_PASSWORD_FIELD SEC_ZAP_CSRF_FIELD SEC_ZAP_LOGIN_EXTRA SEC_ZAP_TOKEN_PATH SEC_ZAP_OAUTH_SCOPE SEC_ZAP_OAUTH_AUDIENCE SEC_ZAP_OAUTH_CLIENT_AUTH SEC_CREDENTIALS_PROFILE SEC_HISTORY_FETCH SEC_SEMGREP_PACKS SEC_GITLEAKS_HISTORY SEC_SBOM SEC_WORKFLOW_SCAN SEC_K8S_POSTURE SEC_API_FUZZ SEC_EXPOSURE SEC_REPO_POSTURE SEC_API_SPEC SEC_API_NETWORK SEC_EXPOSURE_TARGETS SEC_HISTORY_COMMITS SEC_FUZZ_EXAMPLES SEC_SONAR_HOST_URL SEC_DASHBOARD_URL SEC_DEFECTDOJO_URL SEC_DEFECTDOJO_PRODUCT SEC_DEFECTDOJO_PRODUCT_TYPE SEC_DEFECTDOJO_BRANCHES SEC_DTRACK_URL SEC_DTRACK_PROJECT SEC_DTRACK_BRANCHES SEC_WIZ_SCANS SEC_WIZ_ENFORCE SEC_WIZCLI SEC_WIZCLI_URL SEC_WIZCLI_SHA256 SEC_DISABLED_UNTIL SEC_PRESET SEC_EXCLUDE_PATHS SEC_GITLEAKS SEC_SEMGREP SEC_TRIVY SEC_BANDIT SEC_PIP_AUDIT SEC_NPM_AUDIT SEC_ESLINT SEC_AGENT_SCAN SEC_MODELSCAN SEC_TRIVY_IMAGE SEC_ZAP SEC_REDTEAM SEC_PROFILE SEC_GATE SEC_ENFORCE SEC_SKIP SEC_SONAR SEC_SONAR_KEY SEC_SEMGREP_RULES SEC_DEPCHECK SEC_DEPCHECK_NOUPDATE SEC_IMAGE SEC_ZAP_URL SEC_ZAP_MODE SEC_ZAP_NETWORK SEC_ZAP_OPENAPI SEC_ZAP_ALLOWED_HOSTS SEC_REDTEAM_URL SEC_REDTEAM_NETWORK SEC_REDTEAM_CONTRACT "
 load_config() {
   local line k v
   while IFS= read -r line || [ -n "$line" ]; do
@@ -88,6 +90,11 @@ load_config() {
     [ -z "${!k:-}" ] && printf -v "$k" '%s' "$v"   # an empty env var counts as unset
   done < "$1"
 }
+if [ -n "$ZAP_CONFIG_ARG" ]; then
+  ZAP_CONFIG="$ZAP_CONFIG_ARG"; case "$ZAP_CONFIG" in /*) ;; *) ZAP_CONFIG="$REPO/$ZAP_CONFIG";; esac
+  [ -f "$ZAP_CONFIG" ] || { echo "ZAP config file not found: $ZAP_CONFIG_ARG" >&2; exit 2; }
+  load_config "$ZAP_CONFIG"
+fi
 [ -f "$SEC_DIR/config.env" ] && load_config "$SEC_DIR/config.env"
 # organisation-wide defaults set once by the platform team (SonarQube / dashboard URLs): lowest precedence, a repo's config.env wins
 [ -f "$HERE/configs/central.env" ] && load_config "$HERE/configs/central.env"
@@ -150,6 +157,31 @@ read -r PRESET_ENFORCE PRESET_GATE <<< "$PRESET_OUT"
 : "${SEC_ENFORCE:=$PRESET_ENFORCE}" "${SEC_GATE:=$PRESET_GATE}"
 : "${SEC_IMAGE:=}" "${SEC_ZAP_URL:=}" "${SEC_ZAP_MODE:=baseline}" "${SEC_ZAP_NETWORK:=}" "${SEC_ZAP_OPENAPI:=}" "${SEC_SONAR_KEY:=}" "${SEC_SEMGREP_RULES:=}" "${SEC_SEMGREP_PACKS:=auto}" "${SEC_ZAP_AUTH:=}" "${SEC_HISTORY_FETCH:=auto}"
 : "${SEC_REDTEAM_URL:=}" "${SEC_REDTEAM_NETWORK:=}" "${SEC_REDTEAM_CONTRACT:=}"
+
+# ZAP safety: decided BEFORE any traffic is sent. A host must be in SEC_ZAP_ALLOWED_HOSTS when that is set; otherwise a host that looks like
+# production (prod, production, prd as a whole word of the name) is refused. Addresses with a user name or password in them are refused (they would end up in logs).
+: "${SEC_ZAP_ALLOWED_HOSTS:=}"
+zap_guard() {
+  local u auth h a ok
+  for u in ${SEC_ZAP_URL//,/ } ${SEC_ZAP_OPENAPI}; do
+    case "$u" in http://*|https://*) ;; *) echo "ZAP target '$u' must start with http:// or https://. Nothing was scanned." >&2; exit 2;; esac
+    auth="${u#*://}"; auth="${auth%%/*}"; auth="${auth%%\?*}"
+    case "$auth" in *@*) echo "ZAP target has a user name or password in the address. Put logins in CI secrets (docs/zap-authentication.md), not in the URL. Nothing was scanned." >&2; exit 2;; esac
+    h="${auth%%:*}"; h="${h,,}"
+    [ -n "$h" ] || { echo "ZAP target '$u' has no host name. Nothing was scanned." >&2; exit 2; }
+    if [ -n "$SEC_ZAP_ALLOWED_HOSTS" ]; then
+      ok=0
+      for a in ${SEC_ZAP_ALLOWED_HOSTS//,/ }; do
+        a="${a,,}"
+        case "$a" in \*.*) [[ "$h" == *"${a#\*}" ]] && ok=1;; *) [ "$h" = "$a" ] && ok=1;; esac
+      done
+      [ "$ok" = 1 ] || { echo "ZAP: host '$h' is not in SEC_ZAP_ALLOWED_HOSTS ($SEC_ZAP_ALLOWED_HOSTS). Nothing was scanned. Only a host the app owner approved may be listed." >&2; exit 2; }
+    elif [[ "$h" =~ (^|[.-])(prod|production|prd)([.-]|$) ]]; then
+      echo "ZAP: host '$h' looks like PRODUCTION. ZAP sends attack traffic and must only run against QA or UAT. Nothing was scanned. (If it really is a test system, list it in SEC_ZAP_ALLOWED_HOSTS in a reviewed change.)" >&2; exit 2
+    fi
+  done
+}
+[ -z "$SEC_ZAP_URL$SEC_ZAP_OPENAPI" ] || zap_guard
 case "$SEC_GATE" in pr|release) ;; *) echo "SEC_GATE must be pr or release" >&2; exit 2;; esac
 ENFORCE=""; [ "$SEC_ENFORCE" = 1 ] && ENFORCE="--enforce"
 skip() { [[ ",$SEC_SKIP," == *",$1,"* ]]; }

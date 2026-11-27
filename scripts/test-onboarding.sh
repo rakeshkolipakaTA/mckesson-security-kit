@@ -89,4 +89,70 @@ miss=""; for f in $(grep -ohE '(HERE|ROOT)/scripts/[A-Za-z_]+\.py' "$r/.security
 ( cd "$r" && .security/warden creds list >/dev/null 2>&1 ); check "vendored kit runs creds (copied helper works)" 0 $?
 grep -qE 'git\+https|pip install|rakeshkolipakaTA' "$r/.github/workflows/security-scan.yml" "$r/.security/warden" && check "workflow and launcher do not fetch our repo" 0 1 || check "workflow and launcher do not fetch our repo" 0 0
 
+echo "== ZAP on request: settings file, safety guard, nothing attacked by accident"
+r="$T/vendored"; Z="$r/.security/zap"
+exists "init writes .security/zap/qa.env" "$Z/qa.env"; exists "init writes .security/zap/uat.env" "$Z/uat.env"
+check "the templates ship with no active setting (nothing is scanned until a person fills them in)" 0 "$(grep -vcE '^[[:space:]]*(#|$)' "$Z/qa.env")"
+( cd "$r" && .security/warden zap qa baseline >/dev/null 2>&1 ); check "warden zap on an unfilled template refuses (exit 2)" 2 $?
+( cd "$r" && .security/warden zap ../x >/dev/null 2>&1 ); check "an environment name with ../ is refused" 2 $?
+( cd "$r" && .security/warden zap 'qa;id' >/dev/null 2>&1 ); check "an environment name with shell characters is refused" 2 $?
+( cd "$r" && .security/warden zap qa attack >/dev/null 2>&1 ); check "an unknown mode is refused" 2 $?
+( cd "$r" && .security/warden zap nosuch baseline >/dev/null 2>&1 ); check "an environment without a settings file is refused" 2 $?
+printf 'SEC_ZAP_URL=https://qa.example.com\n' > "$Z/qa.env"
+( cd "$r" && .security/warden zap qa baseline >/dev/null 2>&1 ); check "a settings file without SEC_ZAP_ALLOWED_HOSTS never starts a run" 2 $?
+printf 'SEC_ZAP_URL=https://qa.example.com\nSEC_ZAP_ALLOWED_HOSTS=qa.example.com\nSEC_API_SPEC=https://prod.example.com/openapi.json\nSEC_ZAP_AUTH=login-json\nZAP_AUTH_PASSWORD=hunter2-secret\n' > "$Z/qa.env"
+o="$(cd "$r" && .security/warden zap qa baseline --explain 2>&1)"; rc=$?
+check "a filled-in file passes the checks (explain mode, no traffic)" 0 $rc
+check "only ZAP runs: no code or library scanner, and no API fuzzing of the spec URL named in the file" 1 "$(grep -cE '^  [a-z-]+ +RUN ' <<< "$o")"
+grep -q '^  zap  *RUN' <<< "$o"; check "ZAP is the one that runs" 0 $?
+grep -q 'ZAP_AUTH_PASSWORD looks like a SECRET and was ignored' <<< "$o"; check "a password typed into the settings file is refused" 0 $?
+grep -q 'hunter2-secret' <<< "$o"; check "the refused password is not printed" 1 $?
+o="$(cd "$r" && .security/warden config show 2>&1)"; grep -qE '^  zap +skip' <<< "$o"; check "the normal pull-request scan never reads the ZAP settings (zap stays off)" 0 $?
+g() { scripts/scan.sh examples/clean-python --explain "$@" 2>&1; }
+o="$(g --zap-url https://shop-prod.example.com)"; rc=$?; check "a production-looking host is refused" 2 $rc
+grep -q 'looks like PRODUCTION' <<< "$o"; check "the refusal says why" 0 $?
+g --zap-url https://preprod.example.com >/dev/null; check "preprod is not mistaken for prod" 0 $?
+o="$(g --zap-url 'https://tester:hunter2-secret@qa.example.com')"; rc=$?; check "a password in the address is refused" 2 $rc
+grep -q 'hunter2' <<< "$o"; check "and it is never echoed" 1 $?
+SEC_ZAP_ALLOWED_HOSTS=qa.example.com g --zap-url https://evil.example.org >/dev/null; check "a host outside the allow-list is refused" 2 $?
+SEC_ZAP_ALLOWED_HOSTS='*.test.example.com' g --zap-url 'https://a.test.example.com/x?y=1' >/dev/null; check "a *.suffix entry allows its sub-domains" 0 $?
+SEC_ZAP_ALLOWED_HOSTS='*.test.example.com' g --zap-url https://test.example.com >/dev/null; check "...but not the bare domain" 2 $?
+SEC_ZAP_ALLOWED_HOSTS='*' g --zap-url https://qa.example.com >/dev/null; check "a lone * allows nothing (there is no allow-all)" 2 $?
+SEC_ZAP_ALLOWED_HOSTS=qa.example.com g --zap-url https://qa.example.com --zap-mode api --zap-openapi https://other.example.com/o.json >/dev/null; check "the OpenAPI address is checked against the allow-list too" 2 $?
+g --zap-url ftp://qa.example.com >/dev/null; check "only http and https targets are accepted" 2 $?
+( cd "$r" && .security/warden uninstall --dry-run 2>&1 ) | grep -q '\.security/zap'; check "uninstall keeps the team's ZAP settings" 1 $?
+( cd "$r" && .security/warden uninstall --dry-run --purge 2>&1 ) | grep -q '\.security/zap'; check "uninstall --purge removes them" 0 $?
+while IFS='|' read -r ok n; do check "workflow: $n" 1 "$ok"; done < <(python3 -I - "$r/.security/ci/security-dast.github.yml" <<'PY'
+import re, sys
+t = open(sys.argv[1]).read(); L = t.splitlines(); bad = []
+for i, line in enumerate(L):            # no ${{ }} may sit inside a run: script (script injection)
+    m = re.match(r"^(\s*)(?:- )?run:\s*(.*)$", line)
+    if not m:
+        continue
+    ind, val = len(m.group(1)), m.group(2)
+    body = [val]
+    if val[:1] in "|>":
+        body = []; j = i + 1
+        while j < len(L) and (not L[j].strip() or len(L[j]) - len(L[j].lstrip()) > ind):
+            body.append(L[j]); j += 1
+    if any("${{" in b for b in body):
+        bad.append(line.strip())
+uses = re.findall(r"uses:\s*(\S+)", t)
+rows = [
+  ("no ${{ }} expression inside any run: script (inputs reach the shell only through env)", not bad),
+  ("every action is pinned to a full commit SHA", bool(uses) and all(re.search(r"@[0-9a-f]{40}$", u) for u in uses)),
+  ("checkout does not keep credentials", "persist-credentials: false" in t),
+  ("the token is read-only (contents: read and nothing else)", re.search(r"^permissions:\n  contents: read\n(?!  \w)", t, re.M) is not None),
+  ("an active (full) scan waits for the zap-active-approval environment", "environment: zap-active-approval" in t and "needs: approve-active-scan" in t and "inputs.mode == 'full'" in t),
+  ("the scan job runs in the chosen environment, so only that environment's secrets reach it", "environment: ${{ inputs.environment || 'qa' }}" in t),
+  ("environment and mode are dropdowns, not free text", t.count("type: choice") == 2),
+  ("the weekly run is a passive baseline of qa", "inputs.mode || 'baseline'" in t and "inputs.environment || 'qa'" in t),
+  ("no secret is passed to the job unless a person uncomments it", not re.search(r"^\s+[A-Z_]+: \$\{\{ secrets\.", t, re.M)),
+]
+for n, ok in rows:
+    print(("1" if ok else "0") + "|" + n)
+PY
+)
+grep -q 'zap' "$r/.security/ci/CODEOWNERS.snippet"; check "the CODEOWNERS snippet points reviewers at .security/zap" 0 $?
+
 echo; echo "onboarding test: $PASS passed, $FAILN failed"; [ "$FAILN" = 0 ]

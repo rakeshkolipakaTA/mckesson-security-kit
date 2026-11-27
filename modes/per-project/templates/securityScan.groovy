@@ -8,6 +8,6 @@ def call(Map cfg = [:]) {
     try {
         sh ".security/warden ${cmd} ${args}"
     } finally {
-        archiveArtifacts artifacts: '.security/reports/20*/summary.html, .security/reports/20*/summary.md', allowEmptyArchive: true
+        archiveArtifacts artifacts: '.security/reports/20*/summary.html, .security/reports/20*/assessment.html, .security/reports/20*/summary.md', allowEmptyArchive: true
     }
 }

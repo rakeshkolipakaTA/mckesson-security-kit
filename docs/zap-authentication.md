@@ -4,6 +4,8 @@ A scan of a login page finds little. To test what is **behind** the login, ZAP a
 
 Only run this against QA/UAT systems you own, with a dedicated test account. Never production.
 
+**Running it on request in GitHub?** The login type and addresses go in `.security/zap/<environment>.env` (no secrets), the username, password or token in the GitHub Environment of the same name, and `warden zap <environment> <mode>` does the rest, with an allow-list of hosts, a reviewer's approval for active scans and nothing else running. Setup: [warden-developer-guide.md](warden-developer-guide.md#run-a-zap-test-on-your-running-qa-app-optional).
+
 ## 1. Pick the login type
 Set `SEC_ZAP_AUTH` in `.security/config.env` (non-secret) and give the secrets separately (section 3).
 

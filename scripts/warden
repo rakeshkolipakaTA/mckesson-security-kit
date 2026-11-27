@@ -14,6 +14,7 @@
 #   warden open              open the latest HTML report
 #   warden pull              download/build all scanner images now (so the first scan, or CI, is not slow)
 #   warden redteam --redteam-url URL   (agents) run the AI red-team probes against a RUNNING QA agent you own; needs REDTEAM_TOKEN for authenticated agents
+#   warden zap <environment> [baseline|api|full]   ZAP dynamic test of YOUR running QA/UAT app, settings from .security/zap/<environment>.env (targets, login type; no secrets); refuses hosts not in SEC_ZAP_ALLOWED_HOSTS (docs/zap-authentication.md)
 #   warden agentlib [dir]    (agents) copy the agentsec runtime-controls library (guardrails, policy, audit, ...) into your repo
 #   warden hook install|remove   run `warden quick` automatically before every `git push`
 #   warden init [repo] [--ci github|jenkins|azure|all|none] [--preset starter|standard|strict] [--thin]   add security scanning to a repo (default: current folder; the whole engine is copied into .security/kit, --thin pulls it from the Warden repo instead)
@@ -110,22 +111,37 @@ cmd_uninstall() {
   [ -d "$s" ] || { echo "nothing to remove: no $s here"; return 0; }
   local items=() f
   for f in kit warden warden.lock README.md ci .gitignore reports; do [ -e "$s/$f" ] && items+=("$s/$f"); done
-  [ "$purge" = 1 ] && for f in config.env exceptions.json baseline.json redteam.json zap-rules.tsv; do [ -e "$s/$f" ] && items+=("$s/$f"); done
+  [ "$purge" = 1 ] && for f in config.env exceptions.json baseline.json redteam.json zap-rules.tsv zap; do [ -e "$s/$f" ] && items+=("$s/$f"); done
   local wf=".github/workflows/security-scan.yml" rmwf=0
   if [ -f "$wf" ] && head -1 "$wf" | grep -q 'security-scan.yml  - security scan on every pull request' ; then items+=("$wf"); rmwf=1; fi
   [ ${#items[@]} -gt 0 ] || { echo "nothing to remove"; return 0; }
   echo "This removes:"; printf '  %s\n' "${items[@]}"
-  [ "$purge" = 1 ] || echo "Keeps (use --purge to remove): config.env, exceptions.json, baseline.json, redteam.json"
+  [ "$purge" = 1 ] || echo "Keeps (use --purge to remove): config.env, exceptions.json, baseline.json, redteam.json, zap/"
   [ "$rmwf" = 1 ] || { [ -f "$wf" ] && echo "Keeps $wf (you changed it; remove its security step by hand)"; }
   [ "$dry" = 1 ] && return 0
   if [ "$yes" != 1 ]; then read -r -p "Continue? [y/N] " a || a=n; [[ "$a" =~ ^[Yy] ]] || { echo "cancelled"; return 1; }; fi
   git rev-parse --git-dir >/dev/null 2>&1 && cmd_hook remove >/dev/null 2>&1
   rm -rf "${items[@]}"; rmdir "$s" 2>/dev/null; echo "Removed."
 }
+cmd_zap() {
+  local zenv="${1:-}" mode="${2:-baseline}" d f
+  [ $# -ge 1 ] && shift; [ $# -ge 1 ] && shift
+  [[ "$zenv" =~ ^[a-z0-9][a-z0-9-]{0,30}$ ]] || { echo "usage: warden zap <environment> [baseline|api|full]   (environment: lower-case letters, digits and dashes, e.g. qa; settings live in .security/zap/<environment>.env)" >&2; return 2; }
+  case "$mode" in baseline|api|full) ;; *) echo "mode must be baseline, api or full (got '$mode')" >&2; return 2;; esac
+  d="$(sec_dir)"; case "$d" in /*) ;; *) d="$PWD/$d";; esac; f="$d/zap/$zenv.env"
+  [ -f "$f" ] || { echo "no $f - copy .security/zap/qa.env and fill it in (targets and login type only; passwords and tokens are CI secrets)" >&2; return 2; }
+  grep -qE '^[[:space:]]*SEC_ZAP_URL=[^[:space:]#]' "$f" || { echo "$f does not set SEC_ZAP_URL yet (the QA address to test)" >&2; return 2; }
+  grep -qE '^[[:space:]]*SEC_ZAP_ALLOWED_HOSTS=[^[:space:]#]' "$f" || { echo "$f does not set SEC_ZAP_ALLOWED_HOSTS yet. List the hosts the app owner approved for testing; a run never starts without it." >&2; return 2; }
+  # only the ZAP test runs here: the code and library scanners belong to the pull-request scan
+  # (and nothing else may send traffic: the API-fuzz, exposure, red-team and repo-posture checks stay off even if config.env sets their targets)
+  SEC_SBOM=off SEC_WORKFLOW_SCAN=off SEC_K8S_POSTURE=off SEC_API_FUZZ=off SEC_EXPOSURE=off SEC_REPO_POSTURE=off SEC_REDTEAM=off \
+    exec "$SCAN" $(target_args) --zap-config "$f" --zap-mode "$mode" --partial --skip gitleaks,trivy,semgrep,bandit,pip-audit,npm-audit,eslint,agent-scan,modelscan "$@"
+}
 cmd_open() {
   local dir; dir="$( [ "$IN_KIT" = 1 ] && echo "$(dirname "$ROOT")/reports/latest" || { [ -d .security ] && echo ".security/reports/latest" || echo "reports/latest"; } )"
-  [ -f "$dir/summary.html" ] || { echo "no report yet - run: warden scan"; return 1; }
-  echo "$(readlink -f "$dir/summary.html")"; (xdg-open "$dir/summary.html" || open "$dir/summary.html") >/dev/null 2>&1 || true
+  local f=summary.html; [ "${1:-}" = assessment ] && f=assessment.html   # warden open assessment: the one-document view for a security or audit team
+  [ -f "$dir/$f" ] || { echo "no report yet - run: warden scan"; return 1; }
+  echo "$(readlink -f "$dir/$f")"; (xdg-open "$dir/$f" || open "$dir/$f") >/dev/null 2>&1 || true
 }
 cmd_hook() {
   local gitdir; gitdir="$(git rev-parse --git-dir 2>/dev/null)" || { echo "not a git repository"; return 1; }
@@ -140,7 +156,7 @@ c="${1:-help}"; [ $# -gt 0 ] && shift
 case "$c" in
   doctor)   cmd_doctor "$@";;
   pull)     cmd_pull;;
-  open)     cmd_open;;
+  open)     cmd_open "$@";;
   tickets)  rep="$(sec_dir)/reports/latest"; [ -d "$rep" ] || rep=reports/latest
             exec python3 -I "$ROOT/scripts/tickets.py" --report "$rep" "$@";;
   creds)    exec python3 -I "$ROOT/scripts/creds.py" "$@";;
@@ -174,6 +190,7 @@ case "$c" in
   scan)     exec "$SCAN" $(target_args) "$@";;
   gate)     exec "$SCAN" $(target_args) --enforce "$@";;
   quick)    exec "$SCAN" $(target_args) --enforce --partial --skip trivy,pip-audit,npm-audit "$@";;
+  zap)      cmd_zap "$@";;
   redteam)  exec "$SCAN" $(target_args) --partial --skip gitleaks,trivy,semgrep,bandit,pip-audit,npm-audit,eslint,agent-scan,modelscan "$@";;
   agentlib) dest="${1:-agentsec}"; [ -e "$dest" ] && { echo "$dest already exists"; exit 1; }; cp -r "$ROOT/agentic/agentsec" "$dest" && rm -rf "$dest/__pycache__" && echo "copied agentsec to $dest/ (stdlib only). See docs/agentic-runtime-library.md";;
   baseline) exec "$SCAN" $(target_args) --write-baseline "$@";;

@@ -109,6 +109,18 @@ ZAP_AUTH_TOKEN=s3cr3t-token SEC_ZAP_NETWORK="$NET" scripts/scan.sh examples/clea
 dlog_has nt-auth "AUTHHDR='Bearer s3cr3t-token'"; check "ZAP requests carried the bearer token" 0 $?
 grep -q 'authenticated' "$T/o6.log"; check "the scan log says the scan was authenticated" 0 $?
 grep -q 's3cr3t-token' "$T/o6.log" "$T/o6/zap.log" 2>/dev/null; check "the token does not appear in the scan logs" 1 $?
+echo "== warden zap: the on-request ZAP run (settings file, only ZAP runs, refused targets get no traffic)"
+RZ="$T/zaprepo"; cp -a examples/clean-python "$RZ"; rm -rf "$RZ/.security"; git -C "$RZ" init -q 2>/dev/null
+scripts/warden init "$RZ" --vendor --ci github >/dev/null 2>&1
+printf 'SEC_ZAP_URL=http://nt-auth:8000/\nSEC_ZAP_ALLOWED_HOSTS=nt-auth\nSEC_ZAP_NETWORK=%s\n' "$NET" > "$RZ/.security/zap/qa.env"
+( cd "$RZ" && ZAP_AUTH_TOKEN=s3cr3t-token .security/warden zap qa baseline --out "$T/oz" >"$T/oz.log" 2>&1 ); check "warden zap qa baseline runs from the settings file" 0 $?
+dlog_has nt-auth "AUTHHDR='Bearer s3cr3t-token'"; check "the run reached the app with the CI secret (from the environment, not the file)" 0 $?
+pyj "$T/oz/summary.json" 'list(d["tool_status"])==["zap"] and d["tool_status"]["zap"]=="ok"'; check "only ZAP ran, and it finished ok" 0 $?
+grep -q 's3cr3t-token' "$T/oz.log" "$T/oz/zap.log" 2>/dev/null; check "the secret is not in the logs" 1 $?
+n1="$(docker logs nt-auth 2>&1 | grep -c AUTHHDR)"
+printf 'SEC_ZAP_URL=http://nt-auth:8000/\nSEC_ZAP_ALLOWED_HOSTS=some-other-host\nSEC_ZAP_NETWORK=%s\n' "$NET" > "$RZ/.security/zap/qa.env"
+( cd "$RZ" && ZAP_AUTH_TOKEN=s3cr3t-token .security/warden zap qa baseline --out "$T/oz2" >"$T/oz2.log" 2>&1 ); check "a target outside the allow-list is refused" 2 $?
+n2="$(docker logs nt-auth 2>&1 | grep -c AUTHHDR)"; check "and the app received no request at all" "$n1" "$n2"
 docker rm -f nt-auth >/dev/null 2>&1
 echo "== logins (username + password, form, SSO-style token): credentials come from a local file, never from the repo"
 cat > "$T/authsrv2.py" <<'PY'

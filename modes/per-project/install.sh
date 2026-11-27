@@ -65,6 +65,8 @@ if [ ! -f "$S/config.env" ]; then cp "$T/config.env" "$S/config.env"; [ -n "$PRE
 [ -f "$S/exceptions.json" ] || echo '[]' > "$S/exceptions.json"
 cp "$T/README.md" "$S/README.md"
 printf 'reports/\n' > "$S/.gitignore"
+# ZAP settings per environment (targets + allowed hosts + login type; never secrets). Created once, never overwritten: they are the team's files.
+mkdir -p "$S/zap"; for e in qa uat; do [ -f "$S/zap/$e.env" ] || cp "$T/zap-$e.env" "$S/zap/$e.env"; done
 
 # 3) CI files
 ci_dir="$S/ci"

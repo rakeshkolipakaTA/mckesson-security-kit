@@ -12,10 +12,12 @@ import fnmatch
 import glob
 import datetime as dt
 import hashlib
+import importlib.util
 import html as htmlmod
 import json
 import os
 import re
+import subprocess
 import sys
 from urllib.parse import urlparse
 
@@ -733,6 +735,122 @@ def write_sarif(path, findings):
                        "results": results}]}
     json.dump(sarif, open(path, "w"), indent=1)
 
+# ---- charts in the HTML report (static HTML + a few lines of JS; no external script, nothing leaves the page) ----
+SEV_LABEL = {"CRITICAL": "Critical", "HIGH": "High", "MEDIUM": "Medium", "LOW": "Low", "INFO": "Info"}
+CHART_CSS = """
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0 24px}
+@media (max-width:760px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px 10px;margin:0}
+.chart.wide{grid-column:1/-1}
+.chart h3{margin:0;font-size:14px} .chart .cs{color:var(--mut);font-size:12px;margin:2px 0 10px}
+.rw{display:flex;align-items:center;gap:10px;min-height:26px;border-radius:4px;outline-offset:1px}
+.rw:hover,.rw:focus-visible,td.mk:hover,td.mk:focus-visible{background:color-mix(in srgb,var(--fg) 7%,transparent);outline:2px solid color-mix(in srgb,var(--fg) 45%,transparent)}
+.chart.wide .rw .nm{flex-basis:300px}
+.rw .nm{flex:0 0 150px;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rw .bw{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.rw .bar{height:14px;min-width:2px;border-radius:0 4px 4px 0;background:var(--bar)}
+.rw .v{font-size:12px;font-weight:600;white-space:nowrap}
+.hm{border-collapse:separate;border-spacing:2px;width:100%;margin:0}
+.hm th{font-size:12px;font-weight:600;color:var(--mut);border:0;padding:2px 4px;text-align:center} .hm th.rh{text-align:left;font-weight:400;color:var(--fg);white-space:nowrap}
+.hm td{border:0;padding:0;height:30px;vertical-align:middle;text-align:center;font-size:12px;font-weight:600;border-radius:4px;background:transparent;color:var(--mut)}
+.hm td.h1{background:var(--h1);color:var(--ht1)} .hm td.h2{background:var(--h2);color:var(--ht2)} .hm td.h3{background:var(--h3);color:var(--ht3)}
+.hm td.h4{background:var(--h4);color:var(--ht4)} .hm td.h5{background:var(--h5);color:var(--ht5)} .hm td.h6{background:var(--h6);color:var(--ht6)}
+.scale{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);margin-top:8px}
+.scale i{display:inline-block;width:18px;height:8px;border-radius:2px} .scale .z{background:transparent;border:1px solid var(--line)}
+details.tv{margin-top:8px} details.tv summary{cursor:pointer;color:var(--mut);font-size:12px} details.tv table{margin:6px 0 0;font-size:12px}
+#tip{position:fixed;z-index:9;pointer-events:none;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.18);max-width:320px;display:none}
+#tip b{font-size:14px;display:block} #tip span{color:var(--mut)}
+@media (forced-colors:active){.rw .bar,.hm td{forced-color-adjust:none;background:CanvasText!important;color:Canvas!important}}
+"""
+CHART_VARS_LIGHT = "--bar:#2a78d6;--sc:#d03b3b;--sh:#ec835a;--sm:#fab219;--sl:#2a78d6;--si:#898781;--h1:#cde2fb;--h2:#9ec5f4;--h3:#6da7ec;--h4:#2a78d6;--h5:#1c5cab;--h6:#104281;--ht1:#0b0b0b;--ht2:#0b0b0b;--ht3:#0b0b0b;--ht4:#fff;--ht5:#fff;--ht6:#fff;"
+CHART_VARS_DARK = "--bar:#3987e5;--sc:#d03b3b;--sh:#ec835a;--sm:#fab219;--sl:#3987e5;--si:#898781;--h1:#184f95;--h2:#1c5cab;--h3:#256abf;--h4:#3987e5;--h5:#6da7ec;--h6:#9ec5f4;--ht1:#fff;--ht2:#fff;--ht3:#fff;--ht4:#0b0b0b;--ht5:#0b0b0b;--ht6:#0b0b0b;"
+CHART_JS = """
+(function(){var tip=document.getElementById('tip');if(!tip)return;
+function show(el,x,y){var d=el.dataset;tip.textContent='';var b=document.createElement('b');b.textContent=d.val;var n=document.createElement('div');n.textContent=d.name;tip.appendChild(b);tip.appendChild(n);
+if(d.extra){var s=document.createElement('span');s.textContent=d.extra;tip.appendChild(s)}tip.style.display='block';
+var w=tip.offsetWidth,h=tip.offsetHeight,l=Math.min(x+14,innerWidth-w-8),t=y+14>innerHeight-h-8?y-h-10:y+14;tip.style.left=Math.max(8,l)+'px';tip.style.top=Math.max(8,t)+'px'}
+function hide(){tip.style.display='none'}
+document.querySelectorAll('.mk').forEach(function(el){el.addEventListener('pointermove',function(e){show(el,e.clientX,e.clientY)});el.addEventListener('pointerleave',hide);
+el.addEventListener('focus',function(){var r=el.getBoundingClientRect();show(el,r.left+r.width/2,r.top+r.height/2)});el.addEventListener('blur',hide)})})();
+"""
+
+
+def _chart_short(path, n=48):
+    return path if len(path) <= n else "…" + path[-(n - 1):]
+
+
+def _bar_chart(title, sub, items, total, color=None, wide=False):
+    """items: [(label, value, extra_text, colour_var_or_None, full_label)]; one bar per row, the value at the tip, bars share one scale."""
+    e = htmlmod.escape
+    if not items:
+        return ""
+    top = max(v for _, v, *_ in items) or 1
+    rows, trs = [], []
+    for lab, v, extra, cv, full in items:
+        pct = round(v * 88.0 / top, 1)
+        share = f"{v * 100.0 / total:.0f}% of open findings" if total else ""
+        tip = " · ".join(x for x in (extra, share) if x)
+        style = f' style="width:{pct}%' + (f';background:var({cv})' if cv else "") + '"'
+        rows.append(f'<div class="rw mk" tabindex="0" data-name="{e(full)}" data-val="{v:,}" data-extra="{e(tip)}">'
+                    f'<span class="nm">{e(lab)}</span><div class="bw"><div class="bar"{style}></div><span class="v">{v:,}</span></div></div>')
+        trs.append(f"<tr><td>{e(full)}</td><td>{v:,}</td></tr>")
+    return (f'<figure class="chart{" wide" if wide else ""}"><h3>{e(title)}</h3><div class="cs">{e(sub)}</div>{"".join(rows)}'
+            f'<details class="tv"><summary>Table view</summary><table><tr><th>Name</th><th>Findings</th></tr>{"".join(trs)}</table></details></figure>')
+
+
+def charts_html(findings):
+    """Dashboard charts for the open (not excepted) findings: severity, category, category x severity, tool, top files."""
+    e = htmlmod.escape
+    op = [f for f in findings if not f.get("excepted")]
+    if not op:
+        return ""
+    total = len(op)
+    sevc = {s: sum(1 for f in op if f["severity"] == s) for s in SEV}
+    svar = {"CRITICAL": "--sc", "HIGH": "--sh", "MEDIUM": "--sm", "LOW": "--sl", "INFO": "--si"}
+    c1 = _bar_chart("Open findings by severity", f"{total:,} open findings, most severe first",
+                    [(SEV_LABEL[s], sevc[s], "", svar[s], SEV_LABEL[s]) for s in SEV if sevc[s]], total)
+    cat = {}
+    for f in op:
+        cat.setdefault(f.get("category") or "Other", {s: 0 for s in SEV})[f["severity"]] += 1
+
+    def brk(d):
+        return ", ".join(f"{SEV_LABEL[s]} {d[s]:,}" for s in SEV if d[s])
+    cat_sorted = sorted(cat.items(), key=lambda kv: (-sum(kv[1].values()), kv[0]))
+    c2 = _bar_chart("Findings by category", "What kind of problem: code (SAST), libraries (SCA), secrets, config and so on",
+                    [(k, sum(d.values()), brk(d), None, k) for k, d in cat_sorted], total)
+    # category x severity heat grid (counts printed in the cells; shade = how many)
+    peak = max((d[s] for d in cat.values() for s in SEV), default=1) or 1
+
+    def lvl(n):
+        return 0 if n == 0 else min(6, 1 + int(5 * (n / peak) ** 0.5))
+    sev_cols = [s for s in SEV if sevc[s]]
+    head = "<tr><th></th>" + "".join(f"<th>{SEV_LABEL[s]}</th>" for s in sev_cols) + "</tr>"
+    body = ""
+    for k, d in cat_sorted:
+        cells = "".join(
+            (f'<td class="mk h{lvl(d[s])}" tabindex="0" data-name="{e(k)} · {SEV_LABEL[s]}" data-val="{d[s]:,}" data-extra="findings">{d[s]:,}</td>' if d[s]
+             else '<td class="mk" tabindex="0" data-name="' + e(k) + ' · ' + SEV_LABEL[s] + '" data-val="0" data-extra="findings">–</td>') for s in sev_cols)
+        body += f'<tr><th class="rh">{e(k)}</th>{cells}</tr>'
+    tv = "".join(f"<tr><td>{e(k)}</td>" + "".join(f"<td>{d[s]:,}</td>" for s in sev_cols) + "</tr>" for k, d in cat_sorted)
+    scale = ('<div class="scale">fewer <i class="z"></i>' + "".join(f'<i style="background:var(--h{i})"></i>' for i in range(1, 7)) + f' more (darkest = {peak:,})</div>')
+    c3 = (f'<figure class="chart"><h3>Category by severity</h3><div class="cs">Where the serious findings sit; the number is the count</div>'
+          f'<table class="hm">{head}{body}</table>{scale}<details class="tv"><summary>Table view</summary><table><tr><th>Category</th>'
+          + "".join(f"<th>{SEV_LABEL[s]}</th>" for s in sev_cols) + f"</tr>{tv}</table></details></figure>")
+    tool = {}
+    for f in op:
+        for t in f["tools"]:
+            tool.setdefault(t, {s: 0 for s in SEV})[f["severity"]] += 1
+    tool_sorted = sorted(tool.items(), key=lambda kv: (-sum(kv[1].values()), kv[0]))
+    c4 = _bar_chart("Findings by tool", "A finding that two tools both report counts once for each tool",
+                    [(k, sum(d.values()), brk(d), None, k) for k, d in tool_sorted], total)
+    files = {}
+    for f in op:
+        files.setdefault(f.get("path") or f["location"].rsplit(":", 1)[0], {s: 0 for s in SEV})[f["severity"]] += 1
+    files_sorted = sorted(files.items(), key=lambda kv: (-sum(kv[1].values()), kv[0]))[:10]
+    c5 = _bar_chart("Top files", "The ten files with the most open findings: the quickest place to start fixing",
+                    [(_chart_short(k), sum(d.values()), brk(d), None, k) for k, d in files_sorted], total, wide=True)
+    return f'<div class="charts">{c1}{c3}{c2}{c4}{c5}</div><div id="tip" role="tooltip"></div>'
+
 
 def write_html(path, summary, findings, blocking):
     e = htmlmod.escape
@@ -764,8 +882,8 @@ def write_html(path, summary, findings, blocking):
         agent_html += f"<h3>AI red team</h3><p>{e(str(rt.get('target', '')))}: <b>{rt.get('failed', 0)}</b> probes failed, {rt.get('passed', 0)} passed, {len(rt.get('skipped', []))} skipped.</p>"
     doc = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Security scan - {e(summary['target'])}</title><style>
-:root{{--bg:#fff;--fg:#1d2433;--mut:#5b6678;--line:#dfe3ea;--card:#f6f8fb;--crit:#a3122a;--high:#d9480f;--med:#b7791f;--low:#2b6cb0;--info:#6b7280;--ok:#1a7f4b}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#12161f;--fg:#e6e9ef;--mut:#9aa4b5;--line:#2b3342;--card:#1a202c;--crit:#ff6b81;--high:#ff9a5c;--med:#f0c15a;--low:#6cb2ff;--info:#9aa4b5;--ok:#4cc38a}}}}
+:root{{--bg:#fff;--fg:#1d2433;--mut:#5b6678;--line:#dfe3ea;--card:#f6f8fb;--crit:#a3122a;--high:#d9480f;--med:#b7791f;--low:#2b6cb0;--info:#6b7280;--ok:#1a7f4b;{CHART_VARS_LIGHT}}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#12161f;--fg:#e6e9ef;--mut:#9aa4b5;--line:#2b3342;--card:#1a202c;--crit:#ff6b81;--high:#ff9a5c;--med:#f0c15a;--low:#6cb2ff;--info:#9aa4b5;--ok:#4cc38a;{CHART_VARS_DARK}}}}}
 body{{font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px;max-width:1200px;margin:auto}}
 h1{{font-size:20px;margin:0 0 4px}} .sub{{color:var(--mut);margin-bottom:16px}}
 .result{{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:600;color:#fff}} .result.pass{{background:var(--ok)}} .result.fail{{background:var(--crit)}}
@@ -774,11 +892,12 @@ h1{{font-size:20px;margin:0 0 4px}} .sub{{color:var(--mut);margin-bottom:16px}}
 table{{border-collapse:collapse;width:100%;margin:8px 0 24px}} th,td{{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}} th{{color:var(--mut);font-weight:600}}
 tr.blk td:first-child{{border-left:4px solid var(--crit)}} tr.exc{{opacity:.6}} .sev{{font-weight:700;font-size:12px}} .sev.CRITICAL{{color:var(--crit)}} .sev.HIGH{{color:var(--high)}} .sev.MEDIUM{{color:var(--med)}} .sev.LOW{{color:var(--low)}} .sev.INFO{{color:var(--info)}}
 .ok{{color:var(--ok)}} .bad{{color:var(--crit);font-weight:700}} .fix{{color:var(--mut);font-size:12px}} code{{font-size:12px;word-break:break-all}} select{{padding:4px;margin-right:8px;background:var(--card);color:var(--fg);border:1px solid var(--line)}}
-</style></head><body>
+{CHART_CSS}</style></head><body>
 <h1>Security scan: {e(summary['target'])}</h1>
 <div class="sub">{e(summary['date'])} &middot; gate <b>{e(summary['gate'])}</b> ({e(summary['mode'])}) &middot; baseline {'used' if summary['baseline_used'] else 'not used (all findings count as new)'}</div>
-<span class="result {res_cls}">{e(summary['result'])}</span>
+<span class="result {res_cls}">{e(summary['result'])}</span> <a href="assessment.html">Open the assessment report (for security and audit teams)</a>
 <div class="cards">{cards}</div>
+{charts_html(findings)}
 {('<h3>Reduced coverage</h3><ul>' + notes + '</ul>') if notes else ''}{('<h3>SonarQube quality gate</h3><ul>' + qg + '</ul>') if qg else ''}
 {agent_html}<h3>Tools</h3><table><tr><th>Tool</th><th>Type</th><th>Status</th></tr>{cov}</table>
 <h3>Findings ({len(findings)})</h3>
@@ -791,8 +910,33 @@ Tool <select id="ft"><option value="">all</option>{''.join(f'<option>{e(t)}</opt
 const s=document.getElementById('fs'),t=document.getElementById('ft'),b=document.getElementById('fb');
 function f(){{document.querySelectorAll('#t tr[data-sev]').forEach(r=>{{r.style.display=((!s.value||r.dataset.sev===s.value)&&(!t.value||r.dataset.tool.split('+').includes(t.value))&&(!b.checked||r.classList.contains('blk')))?'':'none'}})}}
 s.onchange=t.onchange=b.onchange=f;
-</script></body></html>"""
+{CHART_JS}</script></body></html>"""
     open(path, "w").write(doc)
+
+
+def write_assessment(a, summary, findings, blocking, policy):
+    """assessment.html: the one-document view for a security or audit team (scripts/assessment.py). Never allowed to break the scan."""
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        spec = importlib.util.spec_from_file_location("warden_assessment", os.path.join(here, "assessment.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        def git(*args):
+            try:
+                return subprocess.run(["git", "-C", a.root, *args], capture_output=True, text=True, timeout=10).stdout.strip()
+            except Exception:
+                return ""
+        try:
+            version = open(os.path.join(here, "..", "VERSION")).read().strip()
+        except OSError:
+            version = "unknown"
+        meta = dict(version=version, commit=os.environ.get("GITHUB_SHA") or git("rev-parse", "HEAD"),
+                    branch=os.environ.get("GITHUB_HEAD_REF") or os.environ.get("GITHUB_REF_NAME") or git("rev-parse", "--abbrev-ref", "HEAD"),
+                    policy=policy["gates"][a.gate], sla_days=policy.get("sla_days"))
+        mod.write(os.path.join(a.out, "assessment.html"), summary, findings, blocking, meta)
+    except Exception as ex:  # a report problem must not change the scan result
+        print(f"   NOTE assessment.html not written: {ex}")
 
 
 def main():
@@ -859,7 +1003,8 @@ def main():
                    overdue=len(overdue), overdue_by_severity={s: sum(1 for f in overdue if f["severity"] == s) for s in SEV if any(f["severity"] == s for f in overdue)},
                    preset=plan.get("preset"), excluded_by_path=excluded, exclude_paths=[p for p in a.exclude.split(",") if p],
                    tools_not_run={t: v["reason"] for t, v in plan.get("tools", {}).items() if not v["run"] and v["mode"] == "off" and v.get("explicit")},
-                   tools_forced=[t for t, v in plan.get("tools", {}).items() if v.get("forced")], tool_waivers=plan.get("waivers", []))
+                   tools_forced=[t for t, v in plan.get("tools", {}).items() if v.get("forced")], tool_waivers=plan.get("waivers", []),
+                   tool_plan={t: dict(run=v.get("run"), reason=v.get("reason", "")) for t, v in plan.get("tools", {}).items()})
     json.dump(findings, open(os.path.join(a.out, "findings.json"), "w"), indent=1)
     json.dump(summary, open(os.path.join(a.out, "summary.json"), "w"), indent=1)
     with open(os.path.join(a.out, "crosswalk.csv"), "w", newline="") as fh:
@@ -870,6 +1015,7 @@ def main():
     write_md(os.path.join(a.out, "summary.md"), summary, findings, blocking)
     write_html(os.path.join(a.out, "summary.html"), summary, findings, blocking)
     write_sarif(os.path.join(a.out, "results.sarif"), findings)
+    write_assessment(a, summary, findings, blocking, policy)
 
     print(f"\n== Security gate [{a.gate}, {summary['mode']}] for {a.target}: {result}")
     print("   open: " + "  ".join(f"{s}={n}" for s, n in summary["counts"].items()))

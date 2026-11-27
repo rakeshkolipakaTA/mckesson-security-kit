@@ -16,7 +16,7 @@ stage('Security scan') {
     }
     post {
         always {
-            archiveArtifacts artifacts: '.security/reports/20*/summary.html, .security/reports/20*/summary.md, .security/reports/20*/results.sarif', allowEmptyArchive: true
+            archiveArtifacts artifacts: '.security/reports/20*/summary.html, .security/reports/20*/assessment.html, .security/reports/20*/summary.md, .security/reports/20*/results.sarif', allowEmptyArchive: true
             // Optional (HTML Publisher plugin): shows the report as a link on the build page
             // publishHTML(target: [reportDir: '.security/reports/latest', reportFiles: 'summary.html', reportName: 'Security report', keepAll: true, allowMissing: true])
         }
